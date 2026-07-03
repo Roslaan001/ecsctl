@@ -5,7 +5,7 @@ A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 ## Installation
 
 ```bash
-git clone https://github.com/roslaan001/ecsctl.git
+git clone https://github.com/Roslaan001/ecsctl.git
 cd ecsctl
 make install
 ```
@@ -14,16 +14,22 @@ make install
 
 `ecsctl` uses the standard AWS credential chain — environment variables, `~/.aws/credentials`, or IAM roles. Use `--region` and `--profile` flags to override per command.
 
-## Usage
+---
 
-### Clusters
+## Declarative Resource Management
+
+You can manage resources declaratively using YAML configurations.
+
+### 1. Apply (Create or Update)
+
+The `apply` command creates resources if they are absent or reconciles them if there is a configuration drift.
 
 ```bash
-# Create a cluster from a YAML config
-ecsctl create cluster -f cluster.yaml
+# Preview changes without applying
+ecsctl apply -f cluster.yaml --dry-run
 
-# Delete a cluster
-ecsctl delete cluster my-cluster
+# Apply configuration and wait for stability
+ecsctl apply -f service.yaml --wait
 ```
 
 **cluster.yaml**
@@ -36,19 +42,6 @@ capacityProviders:
 tags:
   env: production
   team: platform
-```
-
-### Services
-
-```bash
-# Create a service from a YAML config
-ecsctl create service -f service.yaml
-
-# Delete a service
-ecsctl delete service my-service --cluster my-cluster
-
-# Scale a service
-ecsctl scale my-service --cluster my-cluster --desired 3
 ```
 
 **service.yaml**
@@ -68,45 +61,175 @@ tags:
   env: production
 ```
 
-### Deploy
+### 2. Create
 
-Update a service with a new Docker image:
+Explicitly create clusters or services from config files:
 
 ```bash
+ecsctl create cluster -f cluster.yaml
+ecsctl create service -f service.yaml
+```
+
+### 3. Delete
+
+Delete active clusters or services:
+
+```bash
+# Delete a service
+ecsctl delete service my-service --cluster my-cluster
+
+# Delete a cluster
+ecsctl delete cluster my-cluster
+```
+
+---
+
+## Imperative Commands & Operations
+
+### Deploy
+
+Update an ECS service with a new container image:
+
+```bash
+# Deploy to the default container
 ecsctl deploy my-service --cluster my-cluster --image nginx:1.25
+
+# Deploy to a specific container
 ecsctl deploy my-service --cluster my-cluster --image nginx:1.25 --container web
+```
+
+### Scale
+
+Scale the desired task count of an ECS service:
+
+```bash
+ecsctl scale my-service --cluster my-cluster --desired 3
 ```
 
 ### Logs
 
+Stream or retrieve logs from a service's tasks:
+
 ```bash
+# Fetch recent logs
 ecsctl logs my-service --cluster my-cluster
+
+# Tail logs with custom line count
 ecsctl logs my-service --cluster my-cluster --tail 100
+
+# Stream logs in real-time
 ecsctl logs my-service --cluster my-cluster --follow
 ```
 
 ### Exec
 
-Open a shell in a running task (requires ECS Exec enabled on the service):
+Open an interactive shell or run a command inside a running service task container (requires ECS Exec enablement):
 
 ```bash
+# Open interactive shell in default container
 ecsctl exec my-service --cluster my-cluster
+
+# Run in a specific container
 ecsctl exec my-service --cluster my-cluster --container web
-ecsctl exec my-service --cluster my-cluster --command "/bin/bash"
+
+# Run a custom command
+ecsctl exec my-service --cluster my-cluster --command "/bin/sh"
 ```
+
+---
+
+## Inspection & Querying
+
+### List
+
+List resources locally from remote state, or directly from live AWS if no state is configured:
+
+```bash
+# List all ECS clusters
+ecsctl list clusters
+
+# List all services in a cluster
+ecsctl list services --cluster my-cluster
+
+# List running tasks in a cluster or service
+ecsctl list tasks --cluster my-cluster
+ecsctl list tasks --cluster my-cluster --service my-service
+```
+
+### Describe
+
+Retrieve detailed configuration and status information for a specific resource:
+
+```bash
+# Describe cluster configuration and stats
+ecsctl describe cluster my-cluster
+
+# Describe service configuration, deployment, and task status
+ecsctl describe service my-service --cluster my-cluster
+```
+
+---
+
+## Remote State Management
+
+`ecsctl` supports storing resource tracking configurations remotely in an S3 bucket. This acts as a shared state file and context manager similar to Terraform state.
+
+### 1. Initialize State Context
+
+Creates an S3 bucket (or checks existence) in a given region, enables S3 versioning, and saves context details under `~/.ecsctl/config.yaml`.
+
+```bash
+ecsctl state init --context staging --bucket my-ecsctl-staging-state --region eu-west-1
+ecsctl state init --context prod --bucket my-ecsctl-prod-state --region us-east-1 --profile prod-profile
+```
+
+### 2. Switch Contexts
+
+```bash
+# List configured contexts (* indicates current context)
+ecsctl state list-contexts
+
+# Switch the current active context
+ecsctl state use-context staging
+```
+
+### 3. Import Existing Resources
+
+Import your pre-existing AWS ECS resources into `ecsctl` state control:
+
+```bash
+# Import an existing cluster
+ecsctl state import cluster my-existing-cluster --region us-east-1
+
+# Import an existing service
+ecsctl state import service my-existing-service --cluster my-existing-cluster --region us-east-1
+```
+
+### 4. Show Remote State
+
+Print the S3 path and all tracked clusters and services inside the current state context:
+
+```bash
+ecsctl state show
+```
+
+---
 
 ## Global Flags
 
-| Flag        | Description                          |
-|-------------|--------------------------------------|
-| `--region`  | AWS region (overrides env/config)    |
-| `--profile` | AWS profile to use                   |
+The following flags can be passed to any subcommand to override default configurations:
 
-## Build
+| Flag        | Description                                                             |
+|-------------|-------------------------------------------------------------------------|
+| `--region`  | AWS region (overrides environment variables and configurations)         |
+| `--profile` | AWS profile to authenticate with                                       |
+| `--context` | Named state context to use (overrides active context in local config)   |
+
+## Build & Test
 
 ```bash
-make build     # builds to ./bin/ecsctl
-make test      # runs tests
-make lint      # runs golangci-lint
-make clean     # removes build artifacts
+make build     # builds binary to ./bin/ecsctl
+make test      # runs unit tests
+make lint      # runs golangci-lint checking
+make clean     # cleans up build outputs and binaries
 ```
