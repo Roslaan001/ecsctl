@@ -65,7 +65,7 @@ var describeServiceCmd = &cobra.Command{
 
 func init() {
 	describeServiceCmd.Flags().StringVar(&describeClusterName, "cluster", "", "ECS cluster name (required)")
-	describeServiceCmd.MarkFlagRequired("cluster")
+	_ = describeServiceCmd.MarkFlagRequired("cluster")
 
 	describeCmd.AddCommand(describeClusterCmd)
 	describeCmd.AddCommand(describeServiceCmd)

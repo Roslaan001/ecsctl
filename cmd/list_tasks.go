@@ -36,7 +36,7 @@ var listTasksCmd = &cobra.Command{
 func init() {
 	listTasksCmd.Flags().StringVar(&listTasksCluster, "cluster", "", "ECS cluster name (required)")
 	listTasksCmd.Flags().StringVar(&listTasksService, "service", "", "Filter tasks by service name (optional)")
-	listTasksCmd.MarkFlagRequired("cluster")
+	_ = listTasksCmd.MarkFlagRequired("cluster")
 
 	listCmd.AddCommand(listTasksCmd)
 }

@@ -41,6 +41,6 @@ var scaleCmd = &cobra.Command{
 func init() {
 	scaleCmd.Flags().StringVar(&scaleCluster, "cluster", "", "ECS cluster name (required)")
 	scaleCmd.Flags().Int32Var(&scaleDesired, "desired", 1, "Desired task count")
-	scaleCmd.MarkFlagRequired("cluster")
-	scaleCmd.MarkFlagRequired("desired")
+	_ = scaleCmd.MarkFlagRequired("cluster")
+	_ = scaleCmd.MarkFlagRequired("desired")
 }

@@ -347,8 +347,8 @@ func init() {
 	stateInitCmd.Flags().StringVar(&stateInitKey, "key", "", "S3 key prefix for state files (defaults to context name, e.g. 'prod' → prod/state.json)")
 	stateInitCmd.Flags().StringVar(&stateInitProfile, "profile", "", "AWS profile to use")
 	stateInitCmd.Flags().StringVar(&stateInitKmsKey, "kms-key-id", "", "KMS Key ID or ARN for state file encryption (optional)")
-	stateInitCmd.MarkFlagRequired("bucket")
-	stateInitCmd.MarkFlagRequired("region")
+	_ = stateInitCmd.MarkFlagRequired("bucket")
+	_ = stateInitCmd.MarkFlagRequired("region")
 
 	// state import flags
 	stateImportCmd.Flags().StringVar(&stateImportContext, "context", "", "Context to import into (defaults to current context)")

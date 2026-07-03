@@ -144,7 +144,7 @@ func listServicesFromState(ctx context.Context, cluster string) ([]state.Resourc
 
 func init() {
 	listServicesCmd.Flags().StringVar(&listCluster, "cluster", "", "ECS cluster name (required)")
-	listServicesCmd.MarkFlagRequired("cluster")
+	_ = listServicesCmd.MarkFlagRequired("cluster")
 
 	listCmd.AddCommand(listClustersCmd)
 	listCmd.AddCommand(listServicesCmd)

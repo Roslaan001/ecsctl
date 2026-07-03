@@ -54,5 +54,5 @@ func init() {
 	execCmd.Flags().StringVar(&execContainer, "container", "", "Container name to exec into (defaults to first)")
 	execCmd.Flags().StringVar(&execCommand, "command", "/bin/sh", "Command to run inside the container")
 	execCmd.Flags().StringVar(&execTask, "task", "", "Specific task ID (defaults to a running task in the service)")
-	execCmd.MarkFlagRequired("cluster")
+	_ = execCmd.MarkFlagRequired("cluster")
 }

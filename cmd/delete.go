@@ -79,7 +79,7 @@ var deleteServiceCmd = &cobra.Command{
 
 func init() {
 	deleteServiceCmd.Flags().StringVar(&deleteCluster, "cluster", "", "ECS cluster name (required)")
-	deleteServiceCmd.MarkFlagRequired("cluster")
+	_ = deleteServiceCmd.MarkFlagRequired("cluster")
 
 	deleteClusterCmd.Flags().BoolVar(&deleteForce, "force", false, "Delete all services in the cluster before deleting the cluster")
 

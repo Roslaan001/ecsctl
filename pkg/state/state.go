@@ -106,7 +106,7 @@ func (b *Backend) Load(ctx context.Context) (*State, error) {
 		}
 		return nil, fmt.Errorf("reading state from s3://%s/%s: %w", b.bucket, b.stateKey, err)
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 
 	data, err := io.ReadAll(out.Body)
 	if err != nil {
@@ -193,7 +193,7 @@ func (b *Backend) lockInfo(ctx context.Context) (string, error) {
 	if err != nil {
 		return "unknown", nil
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 	data, _ := io.ReadAll(out.Body)
 
 	var info struct {

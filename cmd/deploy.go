@@ -60,6 +60,6 @@ func init() {
 	deployCmd.Flags().StringVar(&deployImage, "image", "", "Docker image to deploy, e.g. nginx:1.25 (required)")
 	deployCmd.Flags().StringVar(&deployContainer, "container", "", "Container name to update (defaults to first container in task def)")
 	deployCmd.Flags().BoolVar(&deployWait, "wait", false, "Wait for the deployment to complete before exiting")
-	deployCmd.MarkFlagRequired("cluster")
-	deployCmd.MarkFlagRequired("image")
+	_ = deployCmd.MarkFlagRequired("cluster")
+	_ = deployCmd.MarkFlagRequired("image")
 }

@@ -152,5 +152,5 @@ func init() {
 	applyCmd.Flags().StringVarP(&applyFile, "file", "f", "", "Path to config YAML (required)")
 	applyCmd.Flags().BoolVar(&applyWait, "wait", false, "Wait for the resource to be stable after creation")
 	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false, "Print the changes that would be made without applying them")
-	applyCmd.MarkFlagRequired("file")
+	_ = applyCmd.MarkFlagRequired("file")
 }

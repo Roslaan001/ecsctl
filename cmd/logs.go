@@ -52,5 +52,5 @@ func init() {
 	logsCmd.Flags().StringVar(&logsContainer, "container", "", "Container name (defaults to first container)")
 	logsCmd.Flags().Int32Var(&logsTail, "tail", 50, "Number of recent log lines to show")
 	logsCmd.Flags().BoolVarP(&logsFollow, "follow", "f", false, "Stream logs continuously")
-	logsCmd.MarkFlagRequired("cluster")
+	_ = logsCmd.MarkFlagRequired("cluster")
 }
