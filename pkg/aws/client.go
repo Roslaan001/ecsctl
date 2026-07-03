@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -303,7 +304,7 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 // newTaskDefARN reaches a PRIMARY/COMPLETED state with runningCount == desiredCount,
 // printing progress dots every 5 seconds. Times out after 10 minutes.
 func (c *Client) WaitForDeployment(ctx context.Context, clusterName, serviceName, newTaskDefARN string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*60*1e9) // 10 minutes
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -429,11 +430,11 @@ func (c *Client) FetchLogs(ctx context.Context, opts LogsOptions, tail int) erro
 	if err != nil || len(listOut.TaskArns) == 0 {
 		return fmt.Errorf("no running tasks found for service %q", opts.Service)
 	}
-	// Task ARN last segment = task ID
+	// Extract task ID from the last segment of the ARN (after the final '/')
 	taskARN := listOut.TaskArns[0]
 	taskID := taskARN
-	if idx := len(taskARN) - 32; idx > 0 {
-		taskID = taskARN[len(taskARN)-32:]
+	if parts := strings.Split(taskARN, "/"); len(parts) > 1 {
+		taskID = parts[len(parts)-1]
 	}
 
 	logStreamName := fmt.Sprintf("%s/%s/%s", streamPrefix, containerName, taskID)
@@ -848,10 +849,10 @@ func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string
 	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, task := range descOut.Tasks {
-		// Extract short task ID from ARN
+		// Extract short task ID from the last segment of the ARN
 		taskID := aws.ToString(task.TaskArn)
-		if len(taskID) > 32 {
-			taskID = taskID[len(taskID)-32:]
+		if parts := strings.Split(taskID, "/"); len(parts) > 1 {
+			taskID = parts[len(parts)-1]
 		}
 
 		startedAt := ""

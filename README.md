@@ -1,14 +1,32 @@
 # ecsctl
 
+[![CI](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
 ## Installation
+
+### Using `go install`
+
+```bash
+go install github.com/roslaan001/ecsctl@latest
+```
+
+### From source
 
 ```bash
 git clone https://github.com/Roslaan001/ecsctl.git
 cd ecsctl
 make install
 ```
+
+### Prerequisites
+
+- Go 1.26+
+- AWS credentials configured (`~/.aws/credentials`, environment variables, or IAM role)
+- [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) (required for `ecsctl exec`)
 
 ## Authentication
 

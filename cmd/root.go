@@ -28,6 +28,7 @@ Examples:
   ecsctl scale my-service --desired 3
   ecsctl delete service my-service
   ecsctl delete cluster my-cluster`,
+	SilenceUsage: true,
 }
 
 // Execute runs the root command.
