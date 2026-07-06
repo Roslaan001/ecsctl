@@ -1,0 +1,17 @@
+/* Custom Deep Navy Blue Theme Overrides for ecsctl */
+
+:root {
+  /* Light Mode */
+  --md-primary-fg-color:        #0d1f3d; /* Very deep navy blue */
+  --md-primary-fg-color--light: #1d3557;
+  --md-primary-fg-color--dark:  #020c1b;
+  --md-accent-fg-color:         #2a9d8f; /* Bright contrast accent */
+}
+
+[data-md-color-scheme="slate"] {
+  /* Dark Mode */
+  --md-primary-fg-color:        #081426; /* Deepest midnight navy */
+  --md-primary-fg-color--light: #0d1f3d;
+  --md-primary-fg-color--dark:  #020710;
+  --md-accent-fg-color:         #4ea8de; /* Brighter sky blue accent */
+}

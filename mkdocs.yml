@@ -51,3 +51,7 @@ nav:
   - Resource Inspection: inspection.md
   - Remote State: state.md
   - CLI Reference: reference.md
+
+extra_css:
+  - stylesheets/extra.css
+
