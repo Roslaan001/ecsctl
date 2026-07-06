@@ -6,15 +6,27 @@
 
 A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
+📖 **[Read the full documentation](https://Roslaan001.github.io/ecsctl)**
+
+---
+
 ## Installation
 
-### Using `go install`
+### 1. Using the installation script (Recommended)
+
+To install the latest precompiled release binary, run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
+```
+
+### 2. Using `go install`
 
 ```bash
 go install github.com/roslaan001/ecsctl@latest
 ```
 
-### From source
+### 3. From source
 
 ```bash
 git clone https://github.com/Roslaan001/ecsctl.git
@@ -22,7 +34,21 @@ cd ecsctl
 make install
 ```
 
-### Prerequisites
+---
+
+## Documentation
+
+The full documentation is built with MkDocs and hosted at [Roslaan001.github.io/ecsctl](https://Roslaan001.github.io/ecsctl).
+
+To preview the documentation locally, run:
+
+```bash
+make docs-serve
+```
+
+This will automatically create a local Python virtual environment, install the `mkdocs-material` theme, and start a live-reloading server at `http://127.0.0.1:8000`.
+
+---
 
 - Go 1.26+
 - AWS credentials configured (`~/.aws/credentials`, environment variables, or IAM role)

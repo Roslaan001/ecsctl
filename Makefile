@@ -5,7 +5,7 @@ BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 BUILD_DIR  := ./bin
 LDFLAGS    := -ldflags "-X github.com/roslaan001/ecsctl/cmd.Version=$(VERSION) -X github.com/roslaan001/ecsctl/cmd.Commit=$(COMMIT) -X github.com/roslaan001/ecsctl/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build clean install tidy lint test
+.PHONY: all build clean install tidy lint test docs-serve docs-build
 
 all: build
 
@@ -33,7 +33,31 @@ test:
 ## clean: remove build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf site
+
+## docs-serve: run mkdocs development server locally
+docs-serve:
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment .venv..."; \
+		python3 -m venv .venv; \
+		.venv/bin/pip install --upgrade pip; \
+		.venv/bin/pip install mkdocs-material; \
+	fi
+	@echo "Starting MkDocs development server..."
+	@.venv/bin/mkdocs serve
+
+## docs-build: build mkdocs static site
+docs-build:
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment .venv..."; \
+		python3 -m venv .venv; \
+		.venv/bin/pip install --upgrade pip; \
+		.venv/bin/pip install mkdocs-material; \
+	fi
+	@echo "Building MkDocs static site..."
+	@.venv/bin/mkdocs build
 
 ## help: print this help
 help:
 	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
+
