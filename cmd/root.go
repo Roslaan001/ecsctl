@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	region  string
-	profile string
+	region       string
+	profile      string
 	stateContext string // named state context, e.g. "prod", "staging"
 )
 

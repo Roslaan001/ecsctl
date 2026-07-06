@@ -23,9 +23,9 @@ var deleteCmd = &cobra.Command{
 
 // delete cluster
 var deleteClusterCmd = &cobra.Command{
-	Use:   "cluster [name]",
-	Short: "Delete an ECS cluster",
-	Args:  cobra.ExactArgs(1),
+	Use:     "cluster [name]",
+	Short:   "Delete an ECS cluster",
+	Args:    cobra.ExactArgs(1),
 	Example: `  ecsctl delete cluster my-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		clusterName := args[0]
@@ -51,9 +51,9 @@ var deleteClusterCmd = &cobra.Command{
 
 // delete service
 var deleteServiceCmd = &cobra.Command{
-	Use:   "service [name]",
-	Short: "Delete an ECS service",
-	Args:  cobra.ExactArgs(1),
+	Use:     "service [name]",
+	Short:   "Delete an ECS service",
+	Args:    cobra.ExactArgs(1),
 	Example: `  ecsctl delete service my-service --cluster my-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		serviceName := args[0]

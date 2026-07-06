@@ -15,9 +15,9 @@ var (
 )
 
 var scaleCmd = &cobra.Command{
-	Use:   "scale [service]",
-	Short: "Scale an ECS service to a desired task count",
-	Args:  cobra.ExactArgs(1),
+	Use:     "scale [service]",
+	Short:   "Scale an ECS service to a desired task count",
+	Args:    cobra.ExactArgs(1),
 	Example: `  ecsctl scale my-service --desired 3 --cluster my-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		serviceName := args[0]
