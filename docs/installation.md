@@ -6,25 +6,43 @@ There are several ways to install `ecsctl` depending on your environment and pre
 
 ## 1. Quick Install Script (Recommended)
 
-To download and install the latest precompiled release binary automatically, run:
+=== "macOS / Linux"
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
-```
+    To download and install the latest precompiled release binary automatically, run:
 
-### Install a Specific Version
-If you wish to install a specific tag/version, pass it as an argument:
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
+    ```
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
-```
+    #### Install a Specific Version
+    If you wish to install a specific tag/version, pass it as an argument:
 
-### Non-Root Installation
-If your user doesn't have root permissions and `sudo` is not available, the script will automatically fallback to installing inside `$HOME/.local/bin`. Make sure to add this path to your shell profile (e.g., `~/.bashrc` or `~/.zshrc`):
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
+    ```
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
+    #### Non-Root Installation
+    If your user doesn't have root permissions and `sudo` is not available, the script will automatically fallback to installing inside `$HOME/.local/bin`. Make sure to add this path to your shell profile (e.g., `~/.bashrc` or `~/.zshrc`):
+
+    ```bash
+    export PATH="$HOME/.local/bin:$PATH"
+    ```
+
+=== "Windows"
+
+    To download and install the latest precompiled release binary automatically on Windows, run the following command in **PowerShell**:
+
+    ```powershell
+    irm https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.ps1 | iex
+    ```
+
+    This script automatically:
+    * Resolves the latest version of `ecsctl`.
+    * Detects your system architecture (AMD64 or ARM64).
+    * Downloads and extracts the official `.zip` archive.
+    * Copies `ecsctl.exe` to `$HOME/.ecsctl/bin`.
+    * Appends the directory to your user `PATH` environment variable.
+
 
 ---
 

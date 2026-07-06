@@ -14,10 +14,14 @@ A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
 ### 1. Using the installation script (Recommended)
 
-To install the latest precompiled release binary, run:
-
+**macOS / Linux**:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
+```
+
+**Windows (PowerShell)**:
+```powershell
+irm https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.ps1 | iex
 ```
 
 ### 2. Using `go install`
