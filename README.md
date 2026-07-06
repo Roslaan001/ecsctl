@@ -111,11 +111,16 @@ tags:
 
 ### 2. Create
 
-Explicitly create clusters or services from config files:
+Explicitly create clusters or services using config files or inline flags:
 
 ```bash
+# Create from configuration files
 ecsctl create cluster -f cluster.yaml
 ecsctl create service -f service.yaml
+
+# Create directly using inline flags
+ecsctl create cluster --name my-cluster --region us-east-1
+ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3
 ```
 
 ### 3. Delete

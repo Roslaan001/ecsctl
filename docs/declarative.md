@@ -95,15 +95,33 @@ tags:
 
 ## The `create` Command
 
-If you want to explicitly create resources from a configuration file and fail if they already exist (instead of updating/reconciling them), use the `create` command:
+The `create` command explicitly creates new resources on AWS and registers them in the remote state backend (if configured). Unlike `apply`, it will fail if the resource already exists. 
+
+You can run `create` in two ways: using a **YAML configuration file** or using **inline CLI flags**.
+
+### Method A: Using a YAML Config File (-f)
+This is the recommended method for tracking resources in git:
 
 ```bash
-# Create a cluster
+# Create a cluster from config
 ecsctl create cluster -f cluster.yaml
 
-# Create a service
+# Create a service from config
 ecsctl create service -f service.yaml
 ```
+
+### Method B: Using Inline CLI Flags
+If you want to quickly spin up a resource without writing a YAML file, pass the configuration as flags:
+
+```bash
+# Create a cluster using flags
+ecsctl create cluster --name my-cluster --region us-east-1 --capacity-providers FARGATE,FARGATE_SPOT
+
+# Create a service using flags
+ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3 \
+  --subnets subnet-abc123 --security-groups sg-abc123
+```
+
 
 ---
 
