@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ECS Service Configuration",
+  "type": "object",
+  "required": ["name", "cluster", "taskDefinition"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the ECS service."
+    },
+    "cluster": {
+      "type": "string",
+      "description": "Name of the ECS cluster to deploy into."
+    },
+    "taskDefinition": {
+      "type": "string",
+      "description": "Family and revision (e.g. family:rev) or full ARN of the task definition."
+    },
+    "launchType": {
+      "type": "string",
+      "enum": ["FARGATE", "EC2"],
+      "default": "FARGATE",
+      "description": "Launch type for the service."
+    },
+    "desiredCount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1,
+      "description": "Number of tasks to keep running."
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "subnets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of subnet IDs."
+        },
+        "securityGroups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of security group IDs."
+        },
+        "assignPublicIp": {
+          "type": "string",
+          "enum": ["ENABLED", "DISABLED"],
+          "default": "ENABLED",
+          "description": "Whether to assign a public IP address."
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value pairs for resource tags."
+    }
+  },
+  "additionalProperties": false
+}

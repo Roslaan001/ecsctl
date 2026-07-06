@@ -1,7 +1,9 @@
 # ecsctl Sample Cluster Configuration
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/cluster.json
 # Usage:
 #   ecsctl apply -f cluster.yaml --wait
 #   ecsctl delete cluster -f cluster.yaml
+
 
 name: my-cluster
 region: us-east-1

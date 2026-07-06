@@ -29,6 +29,24 @@ By default, some operations are asynchronous. If you want the CLI to block and w
 ecsctl apply -f service.yaml --wait
 ```
 
+## IDE Integration & Validation
+
+`ecsctl` provides JSON Schemas for both Cluster and Service configurations. This allows modern editors (like VS Code, IntelliJ, and GoLand) to provide auto-completion, hover definitions, and real-time validation for your configuration files.
+
+To enable validation, add the corresponding schema directive comment to the very top of your YAML file:
+
+**For Clusters:**
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/cluster.json
+```
+
+**For Services:**
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/service.json
+```
+
+*(Note: In VS Code, this requires the Red Hat **YAML** extension).*
+
 ---
 
 ## Configuration Specifications

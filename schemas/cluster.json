@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ECS Cluster Configuration",
+  "type": "object",
+  "required": ["name", "region"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the ECS cluster."
+    },
+    "region": {
+      "type": "string",
+      "description": "AWS region where the cluster resides."
+    },
+    "capacityProviders": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["FARGATE", "FARGATE_SPOT"]
+      },
+      "description": "List of capacity providers."
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value pairs for resource tags."
+    }
+  },
+  "additionalProperties": false
+}

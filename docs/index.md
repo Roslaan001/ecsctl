@@ -1,6 +1,11 @@
 # ecsctl
 
+[![CI](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Roslaan001/ecsctl/blob/main/LICENSE)
+
 `ecsctl` is a CLI tool for managing Amazon ECS (Elastic Container Service) resources, heavily inspired by `eksctl` for EKS. It simplifies operating ECS clusters, services, and tasks by providing both a declarative YAML-based GitOps workflow and simple, fast imperative commands for day-to-day operations.
+
 
 ---
 

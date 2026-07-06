@@ -1,7 +1,9 @@
 # ecsctl Sample Service Configuration
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/service.json
 # Usage:
 #   ecsctl apply -f service.yaml --wait
 #   ecsctl delete service -f service.yaml
+
 
 name: my-service
 cluster: my-cluster
