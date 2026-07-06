@@ -60,20 +60,75 @@ Create or update resources based on YAML configs.
   * `--dry-run` (boolean): Show what changes would occur without applying them.
   * `--wait` (boolean): Wait for resource to reach a stable state before exiting.
 
+### `create`
+Create a new ECS resource and fail if it already exists.
+* **Subcommands**:
+  * `create cluster`: Create an ECS cluster.
+    * **Flags**:
+      * `-f, --file` (string): Path to YAML config.
+      * `--name` (string): Cluster name (required if `-f` is omitted).
+      * `--region` (string): AWS region.
+      * `--capacity-providers` (string slice): Capacity providers, e.g., `FARGATE,FARGATE_SPOT`.
+      * `--tags` (string array): Tags as `key=value` pairs.
+  * `create service`: Create an ECS service.
+    * **Flags**:
+      * `-f, --file` (string): Path to YAML config.
+      * `--name` (string): Service name (required if `-f` is omitted).
+      * `--cluster` (string): Cluster name (required if `-f` is omitted).
+      * `--task-definition` (string): Task definition family:revision (required if `-f` is omitted).
+      * `--launch-type` (string): `FARGATE` or `EC2` (defaults to `FARGATE`).
+      * `--desired-count` (int): Number of tasks to run (defaults to 1).
+      * `--subnets` (string slice): Subnet IDs.
+      * `--security-groups` (string slice): Security Group IDs.
+      * `--assign-public-ip` (string): `ENABLED` or `DISABLED` (defaults to `ENABLED`).
+      * `--tags` (string array): Tags as `key=value` pairs.
+      * `--wait` (boolean): Wait for the service to reach steady state.
+
+### `delete`
+Delete resources.
+* **Subcommands**:
+  * `delete cluster <name>`: Delete a cluster.
+  * `delete service <name>`: Delete a service.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+
+### `describe`
+Show detailed configuration and runtime status.
+* **Subcommands**:
+  * `describe cluster <name>`: Describe a cluster.
+  * `describe service <name>`: Describe a service.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+
+### `list`
+List resources from remote state or live AWS.
+* **Subcommands**:
+  * `list clusters`: List clusters.
+  * `list services`: List services in a cluster.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+  * `list tasks`: List running tasks.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+      * `--service` (string): Filter tasks by service name.
+
 ### `deploy`
+Update a service container image tag (rolling deploy).
 * **Arguments**: `<service-name>`
 * **Flags**:
   * `--cluster` (string, required): Target cluster name.
-  * `--image` (string, required): New container image tag (e.g. `nginx:latest`).
+  * `--image` (string, required): New container image tag (e.g., `nginx:latest`).
   * `--container` (string): Target container name in the task definition (defaults to first container).
 
 ### `scale`
+Scale desired task count of a service.
 * **Arguments**: `<service-name>`
 * **Flags**:
   * `--cluster` (string, required): Target cluster name.
   * `--desired` (integer, required): Desired number of tasks to run.
 
 ### `logs`
+Aggregate and stream logs from service tasks.
 * **Arguments**: `<service-name>`
 * **Flags**:
   * `--cluster` (string, required): Target cluster name.
@@ -81,8 +136,31 @@ Create or update resources based on YAML configs.
   * `--tail` (integer): Number of lines to show from the end (defaults to all).
 
 ### `exec`
+Open interactive shell or run commands in a container task.
 * **Arguments**: `<service-name>`
 * **Flags**:
   * `--cluster` (string, required): Target cluster name.
-  * `--container` (string): Target container name in the task definition.
+  * `--container` (string): Target container name.
   * `--command` (string): Command to execute (defaults to shell).
+
+### `state`
+Manage remote state backend contexts.
+* **Subcommands**:
+  * `state init`: Initialize state context.
+    * **Flags**:
+      * `--context` (string, required): Context name.
+      * `--bucket` (string, required): S3 bucket name.
+      * `--region` (string, required): AWS region.
+      * `--profile` (string): AWS profile.
+      * `--kms-key-id` (string): KMS Key ID for encryption.
+  * `state list-contexts`: List configured contexts.
+  * `state use-context <name>`: Switch active context.
+  * `state import cluster <name>`: Import cluster to state.
+  * `state import service <name>`: Import service to state.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+  * `state show`: Print details of active context.
+
+### `version`
+Print build version and compilation details.
+

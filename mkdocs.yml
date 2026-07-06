@@ -48,5 +48,6 @@ nav:
   - Installation: installation.md
   - Declarative Management: declarative.md
   - Operations & Commands: commands.md
+  - Resource Inspection: inspection.md
   - Remote State: state.md
   - CLI Reference: reference.md
