@@ -168,3 +168,29 @@ ecsctl completion powershell | Out-String | Invoke-Expression
 ecsctl completion powershell >> $PROFILE
 ```
 
+---
+
+## Uninstalling ecsctl
+
+If you need to remove `ecsctl` from your system, delete the binary from your configuration directories.
+
+### macOS / Linux
+
+```bash
+# If installed globally (default)
+sudo rm -f /usr/local/bin/ecsctl
+
+# If installed in local user space
+rm -f $HOME/.local/bin/ecsctl
+```
+
+### Windows
+
+Run the following command in PowerShell:
+
+```powershell
+# Remove the installation directory
+Remove-Item -Recurse -Force $HOME\.ecsctl
+```
+
+

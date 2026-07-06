@@ -128,6 +128,7 @@ $USE_SUDO cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
 $USE_SUDO chmod +x "$TARGET_DIR/$BINARY"
 
 echo "Successfully installed ecsctl to $TARGET_DIR/$BINARY"
+echo "Tip: Run 'ecsctl completion [bash|zsh|fish]' to set up shell autocompletions!"
 
 # Verify installation
 if command -v "$BINARY" >/dev/null 2>&1 || [ -x "$TARGET_DIR/$BINARY" ]; then
