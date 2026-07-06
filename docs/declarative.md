@@ -2,6 +2,9 @@
 
 `ecsctl` supports managing Amazon ECS resources declaratively using YAML configuration files. This allows you to store your infrastructure configurations in git and build GitOps workflows.
 
+> [!TIP]
+> Ready-to-use templates are available in the [examples/](https://github.com/Roslaan001/ecsctl/tree/main/examples) directory of the repository.
+
 ---
 
 ## The `apply` Command

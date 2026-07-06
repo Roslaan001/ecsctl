@@ -1,0 +1,24 @@
+# ecsctl Sample Service Configuration
+# Usage:
+#   ecsctl apply -f service.yaml --wait
+#   ecsctl delete service -f service.yaml
+
+name: my-service
+cluster: my-cluster
+taskDefinition: my-task-def:1
+launchType: FARGATE
+desiredCount: 2
+
+# Network configuration for Fargate tasks
+network:
+  subnets:
+    - subnet-0bb123456789abcde
+    - subnet-0cc123456789abcde
+  securityGroups:
+    - sg-0aa123456789abcde
+  assignPublicIp: ENABLED
+
+# Resource tags applied to the ECS service
+tags:
+  env: production
+  team: platform

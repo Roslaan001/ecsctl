@@ -1,0 +1,18 @@
+# ecsctl Sample Cluster Configuration
+# Usage:
+#   ecsctl apply -f cluster.yaml --wait
+#   ecsctl delete cluster -f cluster.yaml
+
+name: my-cluster
+region: us-east-1
+
+# Optional capacity providers. Standard choices: FARGATE, FARGATE_SPOT
+capacityProviders:
+  - FARGATE
+  - FARGATE_SPOT
+
+# Resource tags applied to the ECS cluster
+tags:
+  env: production
+  team: platform
+  project: core-api
