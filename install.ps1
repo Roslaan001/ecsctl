@@ -25,17 +25,17 @@ switch ($Arch) {
 # Resolve latest release from GitHub API
 Write-Host "Resolving the latest release version for $Repo..."
 $LatestReleaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
-try {
-    # Force TLS 1.2
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -UseBasicParsing
-    $Version = $ReleaseInfo.tag_name
-} catch {
-    Write-Warning "Could not fetch latest release from GitHub. This might be because no releases have been published yet or the API rate limit was hit."
-    Write-Host ""
-    Write-Host "You can install ecsctl from source using Go:"
-    Write-Host "  go install github.com/roslaan001/ecsctl@latest"
-    Exit 1
+if ([string]::IsNullOrEmpty($Version)) {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -Headers @{"User-Agent"="ecsctl-installer"} -UseBasicParsing
+        $Version = $ReleaseInfo.tag_name
+    } catch {
+        $Version = "v0.0.1"
+    }
+}
+if ([string]::IsNullOrEmpty($Version) -or $Version -eq "null") {
+    $Version = "v0.0.1"
 }
 
 $VersionClean = $Version.TrimStart('v')
@@ -43,7 +43,7 @@ Write-Host "Selected version: $Version"
 
 # Format download URL
 $FileName = "${Binary}_${VersionClean}_windows_${ArchName}.zip"
-$DownloadUrl = "https://github.com/$Repo/releases/download/$Version/$FileName"
+$DownloadUrl = "https://ecsctl.abdulsomad005.workers.dev/bin/$FileName"
 
 # Create installation directory
 $InstallDir = Join-Path $env:USERPROFILE ".ecsctl\bin"

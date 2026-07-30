@@ -46,23 +46,16 @@ if [ -z "$VERSION" ]; then
     echo "Resolving the latest release version for $REPO..."
     LATEST_RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
     
-    # Try fetching using curl or wget
+    # Try fetching using curl or wget with User-Agent header
     if command -v curl >/dev/null 2>&1; then
-        VERSION=$(curl -s "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        VERSION=$(curl -sH "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     elif command -v wget >/dev/null 2>&1; then
-        VERSION=$(wget -qO- "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        VERSION=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     fi
     
+    # Fallback to latest known version if repo is private or API limit hit
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        echo "Error: Could not resolve the latest release tag from GitHub." >&2
-        echo "This might be because no releases have been published yet or the API rate limit was hit." >&2
-        echo "" >&2
-        echo "You can install ecsctl from source using Go:" >&2
-        echo "  go install github.com/roslaan001/ecsctl@latest" >&2
-        echo "" >&2
-        echo "Or download a specific version by running the installer with the version as an argument, e.g.:" >&2
-        echo "  curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0" >&2
-        exit 1
+        VERSION="v0.0.1"
     fi
 fi
 
@@ -71,9 +64,8 @@ VERSION_CLEAN=${VERSION#v}
 echo "Selected version: $VERSION"
 
 # Format download URL
-# Filename format aligns with GoReleaser naming convention: ecsctl_{version}_{os}_{arch}.tar.gz
 FILENAME="${BINARY}_${VERSION_CLEAN}_${OS}_${ARCH}.tar.gz"
-DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
+DOWNLOAD_URL="https://ecsctl.abdulsomad005.workers.dev/bin/$FILENAME"
 
 # Create a temporary directory for extraction
 TMP_DIR=$(mktemp -d)

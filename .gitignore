@@ -16,7 +16,8 @@ go.work
 go.work.sum
 
 # Local build output
-bin/
+/bin/
+!docs/bin/
 
 # Python Virtual Environment & MkDocs Build
 .venv/
