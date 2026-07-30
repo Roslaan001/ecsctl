@@ -11,14 +11,14 @@ There are several ways to install `ecsctl` depending on your environment and pre
     To download and install the latest precompiled release binary automatically, run:
 
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
+    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
     ```
 
     #### Install a Specific Version
     If you wish to install a specific tag/version, pass it as an argument:
 
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
+    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh -s -- v0.1.0
     ```
 
     #### Non-Root Installation
@@ -33,7 +33,7 @@ There are several ways to install `ecsctl` depending on your environment and pre
     To download and install the latest precompiled release binary automatically on Windows, run the following command in **PowerShell**:
 
     ```powershell
-    irm https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.ps1 | iex
+    irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
     ```
 
     This script automatically:
