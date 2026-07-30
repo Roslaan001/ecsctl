@@ -41,11 +41,13 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-  - tables
+extra:
+  generator: false
 
 nav:
   - Getting Started: index.md
   - Installation: installation.md
+  - Uninstallation: uninstallation.md
   - Declarative Management: declarative.md
   - Operations & Commands: commands.md
   - Resource Inspection: inspection.md
