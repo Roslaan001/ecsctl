@@ -97,27 +97,32 @@ fi
 
 # Determine target directory
 # Default to /usr/local/bin, fallback to $HOME/.local/bin if not root and /usr/local/bin not writable.
+# Determine target directory and perform installation
 TARGET_DIR="/usr/local/bin"
-USE_SUDO=""
+INSTALLED=0
 
-if [ ! -w "$TARGET_DIR" ]; then
-    if [ "$(id -u)" -ne 0 ]; then
-        if command -v sudo >/dev/null 2>&1; then
-            echo "Installing to $TARGET_DIR (requires sudo)..."
-            USE_SUDO="sudo"
-        else
-            TARGET_DIR="$HOME/.local/bin"
-            echo "Installing to $TARGET_DIR (no sudo available)..."
-            mkdir -p "$TARGET_DIR"
+if [ -w "$TARGET_DIR" ]; then
+    echo "Installing to $TARGET_DIR..."
+    cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
+    chmod +x "$TARGET_DIR/$BINARY"
+    INSTALLED=1
+else
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        echo "Installing to $TARGET_DIR (requires sudo)..."
+        if sudo cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY" 2>/dev/null && sudo chmod +x "$TARGET_DIR/$BINARY" 2>/dev/null; then
+            INSTALLED=1
         fi
     fi
-else
-    echo "Installing to $TARGET_DIR..."
-fi
 
-# Copy binary to target directory
-$USE_SUDO cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
-$USE_SUDO chmod +x "$TARGET_DIR/$BINARY"
+    if [ "$INSTALLED" -eq 0 ]; then
+        TARGET_DIR="$HOME/.local/bin"
+        echo "Installing to $TARGET_DIR (no sudo required)..."
+        mkdir -p "$TARGET_DIR"
+        cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
+        chmod +x "$TARGET_DIR/$BINARY"
+        INSTALLED=1
+    fi
+fi
 
 echo "Successfully installed ecsctl to $TARGET_DIR/$BINARY"
 echo "Tip: Run 'ecsctl completion [bash|zsh|fish]' to set up shell autocompletions!"
