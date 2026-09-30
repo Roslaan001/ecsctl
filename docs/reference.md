@@ -153,6 +153,7 @@ Manage ECS Express Mode web services; see [Express Mode guide](express.md).
 * `express update --service-arn ARN -f FILE [--wait]`: Update a service.
 * `express describe --service-arn ARN`: Show service status.
 * `express delete --service-arn ARN`: Begin managed service deletion.
+* `express list [--cluster NAME]`: List Express Mode services.
 
 ### Task definitions and one-off tasks
 * `register task-definition -f FILE`: Register an ECS task definition JSON document.
@@ -175,7 +176,11 @@ Manage remote state backend contexts.
   * `state import service <name>`: Import service to state.
     * **Flags**:
       * `--cluster` (string, required): Cluster name.
-  * `state show`: Print details of active context.
+  * `state import express <name-or-arn>`: Import an Express service and capture its configuration.
+    * **Flags**:
+      * `--cluster` (string, required): Cluster name.
+  * `state config <cluster|service|express> [name]`: Print captured YAML configuration. Service and Express resources accept `--cluster`.
+  * `state show`: Print details of active context and tracked resources.
 
 ### `version`
 Print build version and compilation details.

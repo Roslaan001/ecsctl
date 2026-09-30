@@ -106,28 +106,39 @@ type ServiceAutoScalingConfig struct {
 // ExpressServiceConfig describes an ECS Express Mode web service. ECS creates
 // and manages the supporting load balancer, URL, scaling, logs, and alarms.
 type ExpressServiceConfig struct {
-	ServiceName           string            `yaml:"serviceName"`
-	Cluster               string            `yaml:"cluster"`
-	InfrastructureRoleARN string            `yaml:"infrastructureRoleArn"`
-	ExecutionRoleARN      string            `yaml:"executionRoleArn"`
-	TaskRoleARN           string            `yaml:"taskRoleArn"`
-	TaskDefinitionARN     string            `yaml:"taskDefinitionArn"`
-	Image                 string            `yaml:"image"`
-	ContainerPort         int32             `yaml:"containerPort"`
-	Command               []string          `yaml:"command"`
-	Environment           map[string]string `yaml:"environment"`
-	Secrets               map[string]string `yaml:"secrets"`
-	CPU                   string            `yaml:"cpu"`
-	Memory                string            `yaml:"memory"`
-	CPUArchitecture       string            `yaml:"cpuArchitecture"`
-	HealthCheckPath       string            `yaml:"healthCheckPath"`
-	Subnets               []string          `yaml:"subnets"`
-	SecurityGroups        []string          `yaml:"securityGroups"`
-	MinTaskCount          int32             `yaml:"minTaskCount"`
-	MaxTaskCount          int32             `yaml:"maxTaskCount"`
-	ScalingMetric         string            `yaml:"scalingMetric"`
-	ScalingTargetValue    int32             `yaml:"scalingTargetValue"`
-	Tags                  map[string]string `yaml:"tags"`
+	ServiceName           string                              `yaml:"serviceName"`
+	Cluster               string                              `yaml:"cluster"`
+	InfrastructureRoleARN string                              `yaml:"infrastructureRoleArn"`
+	ExecutionRoleARN      string                              `yaml:"executionRoleArn"`
+	TaskRoleARN           string                              `yaml:"taskRoleArn"`
+	TaskDefinitionARN     string                              `yaml:"taskDefinitionArn"`
+	Image                 string                              `yaml:"image"`
+	ContainerPort         int32                               `yaml:"containerPort"`
+	Command               []string                            `yaml:"command"`
+	Environment           map[string]string                   `yaml:"environment"`
+	Secrets               map[string]string                   `yaml:"secrets"`
+	AWSLogsConfiguration  *ExpressAWSLogsConfig               `yaml:"awsLogsConfiguration"`
+	RepositoryCredentials *ExpressRepositoryCredentialsConfig `yaml:"repositoryCredentials"`
+	CPU                   string                              `yaml:"cpu"`
+	Memory                string                              `yaml:"memory"`
+	CPUArchitecture       string                              `yaml:"cpuArchitecture"`
+	HealthCheckPath       string                              `yaml:"healthCheckPath"`
+	Subnets               []string                            `yaml:"subnets"`
+	SecurityGroups        []string                            `yaml:"securityGroups"`
+	MinTaskCount          int32                               `yaml:"minTaskCount"`
+	MaxTaskCount          int32                               `yaml:"maxTaskCount"`
+	ScalingMetric         string                              `yaml:"scalingMetric"`
+	ScalingTargetValue    int32                               `yaml:"scalingTargetValue"`
+	Tags                  map[string]string                   `yaml:"tags"`
+}
+
+type ExpressAWSLogsConfig struct {
+	LogGroup        string `yaml:"logGroup"`
+	LogStreamPrefix string `yaml:"logStreamPrefix"`
+}
+
+type ExpressRepositoryCredentialsConfig struct {
+	CredentialsParameter string `yaml:"credentialsParameter"`
 }
 
 // ServiceConfig represents the YAML config for creating an ECS service.
@@ -152,6 +163,7 @@ type ServiceConfig struct {
 	Cluster                       string                           `yaml:"cluster"`
 	TaskDefinition                string                           `yaml:"taskDefinition"`
 	LaunchType                    string                           `yaml:"launchType"`
+	SchedulingStrategy            string                           `yaml:"schedulingStrategy"`
 	DesiredCount                  int32                            `yaml:"desiredCount"`
 	NetworkConfig                 *NetworkConfig                   `yaml:"network"`
 	Tags                          map[string]string                `yaml:"tags"`
@@ -185,6 +197,9 @@ func DetectResourceType(path string) (string, error) {
 	}
 
 	// A service config always has a "cluster" field; a cluster config does not.
+	if _, ok := raw["serviceName"]; ok {
+		return "express-service", nil
+	}
 	if _, ok := raw["cluster"]; ok {
 		return "service", nil
 	}
@@ -237,7 +252,19 @@ func LoadServiceConfig(path string) (*ServiceConfig, error) {
 	if cfg.LaunchType == "" {
 		cfg.LaunchType = "FARGATE"
 	}
-	if cfg.DesiredCount == 0 {
+	if cfg.SchedulingStrategy == "" {
+		cfg.SchedulingStrategy = "REPLICA"
+	}
+	if cfg.SchedulingStrategy != "REPLICA" && cfg.SchedulingStrategy != "DAEMON" {
+		return nil, fmt.Errorf("config file %q: schedulingStrategy must be REPLICA or DAEMON", path)
+	}
+	if cfg.SchedulingStrategy == "DAEMON" && cfg.DesiredCount > 0 {
+		return nil, fmt.Errorf("config file %q: desiredCount cannot be set for DAEMON services", path)
+	}
+	if cfg.SchedulingStrategy == "DAEMON" && cfg.AutoScaling != nil {
+		return nil, fmt.Errorf("config file %q: autoScaling cannot be configured for DAEMON services", path)
+	}
+	if cfg.SchedulingStrategy == "REPLICA" && cfg.DesiredCount == 0 {
 		cfg.DesiredCount = 1
 	}
 	if cfg.AutoScaling != nil {
@@ -277,6 +304,24 @@ func LoadExpressServiceConfig(path string) (*ExpressServiceConfig, error) {
 	}
 	if cfg.TaskDefinitionARN != "" && cfg.Image != "" {
 		return nil, fmt.Errorf("config file %q: set either 'taskDefinitionArn' or 'image', not both", path)
+	}
+	if cfg.TaskDefinitionARN != "" && (cfg.ExecutionRoleARN != "" || cfg.TaskRoleARN != "" || cfg.CPU != "" || cfg.Memory != "" || cfg.CPUArchitecture != "" || cfg.Command != nil || cfg.Environment != nil || cfg.Secrets != nil || cfg.AWSLogsConfiguration != nil || cfg.RepositoryCredentials != nil || cfg.ContainerPort != 0) {
+		return nil, fmt.Errorf("config file %q: taskDefinitionArn cannot be combined with task/container configuration fields", path)
+	}
+	if cfg.ContainerPort < 0 || cfg.ContainerPort > 65535 {
+		return nil, fmt.Errorf("config file %q: containerPort must be between 1 and 65535", path)
+	}
+	if cfg.AWSLogsConfiguration != nil && (cfg.AWSLogsConfiguration.LogGroup == "" || cfg.AWSLogsConfiguration.LogStreamPrefix == "") {
+		return nil, fmt.Errorf("config file %q: awsLogsConfiguration requires logGroup and logStreamPrefix", path)
+	}
+	if cfg.RepositoryCredentials != nil && cfg.RepositoryCredentials.CredentialsParameter == "" {
+		return nil, fmt.Errorf("config file %q: repositoryCredentials.credentialsParameter is required", path)
+	}
+	if cfg.MinTaskCount < 0 || cfg.MaxTaskCount < 0 || (cfg.MaxTaskCount > 0 && cfg.MinTaskCount > cfg.MaxTaskCount) {
+		return nil, fmt.Errorf("config file %q: scaling requires 0 <= minTaskCount <= maxTaskCount", path)
+	}
+	if cfg.ScalingTargetValue < 0 {
+		return nil, fmt.Errorf("config file %q: scalingTargetValue cannot be negative", path)
 	}
 	if cfg.ScalingMetric != "" && cfg.ScalingMetric != "AVERAGE_CPU" && cfg.ScalingMetric != "AVERAGE_MEMORY" && cfg.ScalingMetric != "REQUEST_COUNT_PER_TARGET" {
 		return nil, fmt.Errorf("config file %q: scalingMetric must be AVERAGE_CPU, AVERAGE_MEMORY, or REQUEST_COUNT_PER_TARGET", path)

@@ -29,6 +29,8 @@ func TestCreateExpressServiceMapsImageConfiguration(t *testing.T) {
 		Command:               []string{"./serve"},
 		Environment:           map[string]string{"MODE": "test"},
 		Secrets:               map[string]string{"TOKEN": "arn:aws:ssm:us-east-1:123456789012:parameter/token"},
+		AWSLogsConfiguration:  &ecscfg.ExpressAWSLogsConfig{LogGroup: "/ecs/demo", LogStreamPrefix: "app"},
+		RepositoryCredentials: &ecscfg.ExpressRepositoryCredentialsConfig{CredentialsParameter: "arn:aws:secretsmanager:us-east-1:123456789012:secret:registry"},
 		CPU:                   "512",
 		Memory:                "1024",
 		CPUArchitecture:       "ARM64",
@@ -67,6 +69,12 @@ func TestCreateExpressServiceMapsImageConfiguration(t *testing.T) {
 	}
 	if len(in.PrimaryContainer.Secrets) != 1 || awssdk.ToString(in.PrimaryContainer.Secrets[0].Name) != "TOKEN" {
 		t.Fatalf("secrets not mapped: %#v", in.PrimaryContainer.Secrets)
+	}
+	if in.PrimaryContainer.AwsLogsConfiguration == nil || awssdk.ToString(in.PrimaryContainer.AwsLogsConfiguration.LogGroup) != "/ecs/demo" || awssdk.ToString(in.PrimaryContainer.AwsLogsConfiguration.LogStreamPrefix) != "app" {
+		t.Fatalf("CloudWatch log configuration not mapped: %#v", in.PrimaryContainer.AwsLogsConfiguration)
+	}
+	if in.PrimaryContainer.RepositoryCredentials == nil || awssdk.ToString(in.PrimaryContainer.RepositoryCredentials.CredentialsParameter) != cfg.RepositoryCredentials.CredentialsParameter {
+		t.Fatalf("private registry credentials not mapped: %#v", in.PrimaryContainer.RepositoryCredentials)
 	}
 	if in.ScalingTarget == nil || awssdk.ToInt32(in.ScalingTarget.MinTaskCount) != 1 || awssdk.ToInt32(in.ScalingTarget.MaxTaskCount) != 4 || awssdk.ToInt32(in.ScalingTarget.AutoScalingTargetValue) != 65 {
 		t.Fatalf("scaling target not mapped: %#v", in.ScalingTarget)
@@ -155,5 +163,22 @@ func TestDeleteExpressService(t *testing.T) {
 	}
 	if awssdk.ToString(mock.deleteExpressInput.ServiceArn) != "service-arn" {
 		t.Fatalf("delete request = %#v", mock.deleteExpressInput)
+	}
+}
+
+func TestListExpressServicesFiltersECSManagedResources(t *testing.T) {
+	mock := &mockECS{
+		listServicesOut:    &ecs.ListServicesOutput{ServiceArns: []string{"express-arn"}},
+		describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{ServiceArn: awssdk.String("express-arn"), ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod")}},
+	}
+	services, err := testClient(mock).ListExpressServices(context.Background(), "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(services) != 1 || awssdk.ToString(services[0].ServiceName) != "api" {
+		t.Fatalf("services = %#v", services)
+	}
+	if awssdk.ToString(mock.listServicesIn.Cluster) != "prod" || mock.listServicesIn.ResourceManagementType != types.ResourceManagementTypeEcs {
+		t.Fatalf("list filter = %#v", mock.listServicesIn)
 	}
 }

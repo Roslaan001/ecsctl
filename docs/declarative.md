@@ -92,6 +92,7 @@ name: my-service
 cluster: my-cluster
 taskDefinition: my-task-def:3
 launchType: FARGATE
+schedulingStrategy: REPLICA # REPLICA (default) or DAEMON
 desiredCount: 2
 network:
   subnets:
@@ -127,7 +128,8 @@ tags:
 | `cluster` | string | Name of the cluster the service will run in. |
 | `taskDefinition` | string | Family and revision (e.g. `family:rev` or full ARN) of the task definition. |
 | `launchType` | string | Launch type (usually `FARGATE` or `EC2`). |
-| `desiredCount` | integer | Number of tasks to keep running. |
+| `schedulingStrategy` | string | `REPLICA` (default) or `DAEMON`. DAEMON services cannot set `desiredCount` or `autoScaling`. |
+| `desiredCount` | integer | Number of tasks to keep running for a REPLICA service. |
 | `network` | object | Network configuration for the tasks. |
 | `network.subnets` | list | Subnet IDs where tasks will be spawned. |
 | `network.securityGroups`| list | Security Group IDs to associate with the tasks. |
@@ -148,6 +150,17 @@ tags:
 | `tags` | map | Key-value pairs for resource tagging. |
 
 `apply` reconciles the task definition, desired count, configured service settings, and tags. Fields left out of the file are not treated as requests to clear an existing setting. Auto scaling is applied through Application Auto Scaling; the caller needs permission to register scalable targets and scaling policies.
+
+### ECS Express Mode Services
+
+Express services use their own resource shape and can also be managed declaratively:
+
+```bash
+ecsctl apply -f express.yaml --wait
+ecsctl express list --cluster production
+```
+
+See the [Express Mode guide](express.md) for the supported fields and lifecycle commands.
 
 ---
 

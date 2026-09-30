@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
+	"github.com/roslaan001/ecsctl/pkg/state"
+	"gopkg.in/yaml.v3"
 )
 
 // CreateExpressService provisions an ECS Express Mode service and its managed ingress,
@@ -90,6 +92,115 @@ func (c *Client) DescribeExpressService(ctx context.Context, arn string) (*types
 	return out.Service, nil
 }
 
+// ListExpressServices returns ECS-managed Express services in the requested cluster.
+// When cluster is empty, ECS lists services in the default cluster.
+func (c *Client) ListExpressServices(ctx context.Context, cluster string) ([]types.ECSExpressGatewayService, error) {
+	var token *string
+	var arns []string
+	for {
+		page, err := c.ecs.ListServices(ctx, &ecs.ListServicesInput{
+			Cluster: optionalString(cluster), NextToken: token,
+			ResourceManagementType: types.ResourceManagementTypeEcs,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("listing Express services: %w", err)
+		}
+		arns = append(arns, page.ServiceArns...)
+		if page.NextToken == nil {
+			break
+		}
+		token = page.NextToken
+	}
+
+	services := make([]types.ECSExpressGatewayService, 0, len(arns))
+	for _, arn := range arns {
+		service, err := c.DescribeExpressService(ctx, arn)
+		if err != nil {
+			return nil, fmt.Errorf("describing Express service %q: %w", arn, err)
+		}
+		if service != nil {
+			services = append(services, *service)
+		}
+	}
+	return services, nil
+}
+
+// DescribeExpressServiceResource imports an Express service with its active
+// configuration snapshot so state import can capture a reusable YAML baseline.
+func (c *Client) DescribeExpressServiceResource(ctx context.Context, arn string) (*state.Resource, error) {
+	service, err := c.DescribeExpressService(ctx, arn)
+	if err != nil {
+		return nil, fmt.Errorf("describing Express service: %w", err)
+	}
+	if service == nil {
+		return nil, fmt.Errorf("Express service %q not found", arn)
+	}
+	cfg := expressConfigFromService(service)
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("serializing Express service configuration: %w", err)
+	}
+	return &state.Resource{
+		Type: state.ResourceTypeExpressService, Name: aws.ToString(service.ServiceName), ARN: aws.ToString(service.ServiceArn),
+		Cluster: aws.ToString(service.Cluster), CreatedBy: "imported", Configuration: string(serialized),
+	}, nil
+}
+
+func expressConfigFromService(service *types.ECSExpressGatewayService) *ecscfg.ExpressServiceConfig {
+	cfg := &ecscfg.ExpressServiceConfig{
+		ServiceName: aws.ToString(service.ServiceName), Cluster: aws.ToString(service.Cluster),
+		InfrastructureRoleARN: aws.ToString(service.InfrastructureRoleArn),
+	}
+	if len(service.ActiveConfigurations) == 0 {
+		return cfg
+	}
+	revision := service.ActiveConfigurations[0]
+	if revision.TaskDefinitionArn != nil {
+		cfg.TaskDefinitionARN = aws.ToString(revision.TaskDefinitionArn)
+	} else {
+		cfg.ExecutionRoleARN = aws.ToString(revision.ExecutionRoleArn)
+		cfg.TaskRoleARN = aws.ToString(revision.TaskRoleArn)
+		cfg.CPU = aws.ToString(revision.Cpu)
+		cfg.Memory = aws.ToString(revision.Memory)
+		cfg.CPUArchitecture = string(revision.CpuArchitecture)
+		if container := revision.PrimaryContainer; container != nil {
+			cfg.Image = aws.ToString(container.Image)
+			cfg.ContainerPort = aws.ToInt32(container.ContainerPort)
+			cfg.Command = container.Command
+			cfg.Environment = make(map[string]string, len(container.Environment))
+			for _, value := range container.Environment {
+				cfg.Environment[aws.ToString(value.Name)] = aws.ToString(value.Value)
+			}
+			cfg.Secrets = make(map[string]string, len(container.Secrets))
+			for _, value := range container.Secrets {
+				cfg.Secrets[aws.ToString(value.Name)] = aws.ToString(value.ValueFrom)
+			}
+			if logs := container.AwsLogsConfiguration; logs != nil {
+				cfg.AWSLogsConfiguration = &ecscfg.ExpressAWSLogsConfig{LogGroup: aws.ToString(logs.LogGroup), LogStreamPrefix: aws.ToString(logs.LogStreamPrefix)}
+			}
+			if credentials := container.RepositoryCredentials; credentials != nil {
+				cfg.RepositoryCredentials = &ecscfg.ExpressRepositoryCredentialsConfig{CredentialsParameter: aws.ToString(credentials.CredentialsParameter)}
+			}
+		}
+	}
+	cfg.HealthCheckPath = aws.ToString(revision.HealthCheckPath)
+	if network := revision.NetworkConfiguration; network != nil {
+		cfg.Subnets = network.Subnets
+		cfg.SecurityGroups = network.SecurityGroups
+	}
+	if scaling := revision.ScalingTarget; scaling != nil {
+		cfg.MinTaskCount = aws.ToInt32(scaling.MinTaskCount)
+		cfg.MaxTaskCount = aws.ToInt32(scaling.MaxTaskCount)
+		cfg.ScalingMetric = string(scaling.AutoScalingMetric)
+		cfg.ScalingTargetValue = aws.ToInt32(scaling.AutoScalingTargetValue)
+	}
+	cfg.Tags = make(map[string]string, len(service.Tags))
+	for _, tag := range service.Tags {
+		cfg.Tags[aws.ToString(tag.Key)] = aws.ToString(tag.Value)
+	}
+	return cfg
+}
+
 func (c *Client) DeleteExpressService(ctx context.Context, arn string) error {
 	_, err := c.ecs.DeleteExpressGatewayService(ctx, &ecs.DeleteExpressGatewayServiceInput{ServiceArn: aws.String(arn)})
 	return err
@@ -132,6 +243,15 @@ func expressContainer(cfg *ecscfg.ExpressServiceConfig) *types.ExpressGatewayCon
 	}
 	for key, value := range cfg.Secrets {
 		container.Secrets = append(container.Secrets, types.Secret{Name: aws.String(key), ValueFrom: aws.String(value)})
+	}
+	if cfg.AWSLogsConfiguration != nil {
+		container.AwsLogsConfiguration = &types.ExpressGatewayServiceAwsLogsConfiguration{
+			LogGroup:        aws.String(cfg.AWSLogsConfiguration.LogGroup),
+			LogStreamPrefix: aws.String(cfg.AWSLogsConfiguration.LogStreamPrefix),
+		}
+	}
+	if cfg.RepositoryCredentials != nil {
+		container.RepositoryCredentials = &types.ExpressGatewayRepositoryCredentials{CredentialsParameter: aws.String(cfg.RepositoryCredentials.CredentialsParameter)}
 	}
 	return container
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/roslaan001/ecsctl/pkg/localconfig"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // createCmd is the parent for all "create" subcommands.
@@ -82,7 +83,7 @@ var createClusterCmd = &cobra.Command{
 		fmt.Printf("✓ Cluster %q created successfully.\n", cfg.Name)
 
 		// Write to remote state if a context is configured
-		if err := writeClusterState(cfg.Name, resolvedRegion); err != nil {
+		if err := writeClusterState(cfg, resolvedRegion); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: cluster created but state not updated: %v\n", err)
 		}
 
@@ -92,17 +93,18 @@ var createClusterCmd = &cobra.Command{
 
 // --- create service flags ---
 var (
-	createServiceFile           string
-	createServiceName           string
-	createServiceCluster        string
-	createServiceTaskDefinition string
-	createServiceLaunchType     string
-	createServiceDesiredCount   int32
-	createServiceSubnets        []string
-	createServiceSecurityGroups []string
-	createServicePublicIP       string
-	createServiceTags           []string
-	createServiceWait           bool
+	createServiceFile               string
+	createServiceName               string
+	createServiceCluster            string
+	createServiceTaskDefinition     string
+	createServiceLaunchType         string
+	createServiceSchedulingStrategy string
+	createServiceDesiredCount       int32
+	createServiceSubnets            []string
+	createServiceSecurityGroups     []string
+	createServicePublicIP           string
+	createServiceTags               []string
+	createServiceWait               bool
 )
 
 // create service
@@ -136,13 +138,28 @@ var createServiceCmd = &cobra.Command{
 				return fmt.Errorf("--task-definition is required")
 			}
 
+			schedulingStrategy := createServiceSchedulingStrategy
+			if schedulingStrategy == "" {
+				schedulingStrategy = "REPLICA"
+			}
+			if schedulingStrategy != "REPLICA" && schedulingStrategy != "DAEMON" {
+				return fmt.Errorf("--scheduling-strategy must be REPLICA or DAEMON")
+			}
+			desiredCount := createServiceDesiredCount
+			if schedulingStrategy == "DAEMON" {
+				if cmd.Flags().Changed("desired-count") && desiredCount > 0 {
+					return fmt.Errorf("--desired-count cannot be set for DAEMON services")
+				}
+				desiredCount = 0
+			}
 			cfg = &config.ServiceConfig{
-				Name:           createServiceName,
-				Cluster:        createServiceCluster,
-				TaskDefinition: createServiceTaskDefinition,
-				LaunchType:     createServiceLaunchType,
-				DesiredCount:   createServiceDesiredCount,
-				Tags:           parseTags(createServiceTags),
+				Name:               createServiceName,
+				Cluster:            createServiceCluster,
+				TaskDefinition:     createServiceTaskDefinition,
+				LaunchType:         createServiceLaunchType,
+				SchedulingStrategy: schedulingStrategy,
+				DesiredCount:       desiredCount,
+				Tags:               parseTags(createServiceTags),
 			}
 
 			if len(createServiceSubnets) > 0 || len(createServiceSecurityGroups) > 0 {
@@ -177,7 +194,7 @@ var createServiceCmd = &cobra.Command{
 		}
 
 		// Write to remote state if a context is configured
-		if err := writeServiceState(cfg.Name, cfg.Cluster, region); err != nil {
+		if err := writeServiceState(cfg, region); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: service created but state not updated: %v\n", err)
 		}
 
@@ -213,6 +230,7 @@ func init() {
 	createServiceCmd.Flags().StringVar(&createServiceCluster, "cluster", "", "ECS cluster name")
 	createServiceCmd.Flags().StringVar(&createServiceTaskDefinition, "task-definition", "", "Task definition family:revision (e.g. my-task:3)")
 	createServiceCmd.Flags().StringVar(&createServiceLaunchType, "launch-type", "FARGATE", "Launch type: FARGATE or EC2")
+	createServiceCmd.Flags().StringVar(&createServiceSchedulingStrategy, "scheduling-strategy", "REPLICA", "Scheduling strategy: REPLICA or DAEMON")
 	createServiceCmd.Flags().Int32Var(&createServiceDesiredCount, "desired-count", 1, "Desired task count")
 	createServiceCmd.Flags().StringSliceVar(&createServiceSubnets, "subnets", nil, "Subnet IDs (comma-separated)")
 	createServiceCmd.Flags().StringSliceVar(&createServiceSecurityGroups, "security-groups", nil, "Security group IDs (comma-separated)")
@@ -226,7 +244,11 @@ func init() {
 
 // writeClusterState writes a newly created cluster into remote state.
 // Silently skips if no state context is configured.
-func writeClusterState(clusterName, region string) error {
+func writeClusterState(cfg *config.ClusterConfig, region string) error {
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing cluster config for remote state: %w", err)
+	}
 	return writeState(func(st *state.State) {
 		u, _ := user.Current()
 		creator := "unknown"
@@ -234,17 +256,22 @@ func writeClusterState(clusterName, region string) error {
 			creator = u.Username
 		}
 		st.AddResource(state.Resource{
-			Type:      state.ResourceTypeCluster,
-			Name:      clusterName,
-			Region:    region,
-			CreatedBy: creator,
-			CreatedAt: time.Now().UTC(),
+			Type:          state.ResourceTypeCluster,
+			Name:          cfg.Name,
+			Region:        region,
+			CreatedBy:     creator,
+			CreatedAt:     time.Now().UTC(),
+			Configuration: string(serialized),
 		})
 	})
 }
 
 // writeServiceState writes a newly created service into remote state.
-func writeServiceState(serviceName, clusterName, region string) error {
+func writeServiceState(cfg *config.ServiceConfig, region string) error {
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing service config for remote state: %w", err)
+	}
 	return writeState(func(st *state.State) {
 		u, _ := user.Current()
 		creator := "unknown"
@@ -252,14 +279,41 @@ func writeServiceState(serviceName, clusterName, region string) error {
 			creator = u.Username
 		}
 		st.AddResource(state.Resource{
-			Type:      state.ResourceTypeService,
-			Name:      serviceName,
-			Cluster:   clusterName,
-			Region:    region,
-			CreatedBy: creator,
-			CreatedAt: time.Now().UTC(),
+			Type:          state.ResourceTypeService,
+			Name:          cfg.Name,
+			Cluster:       cfg.Cluster,
+			Region:        region,
+			CreatedBy:     creator,
+			CreatedAt:     time.Now().UTC(),
+			Configuration: string(serialized),
 		})
 	})
+}
+
+func writeExpressState(cfg *config.ExpressServiceConfig, arn, region string) error {
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing Express config for remote state: %w", err)
+	}
+	return writeState(func(st *state.State) {
+		st.AddResource(state.Resource{
+			Type: state.ResourceTypeExpressService, Name: cfg.ServiceName, ARN: arn,
+			Cluster: cfg.Cluster, Region: region, CreatedBy: currentUsername(),
+			CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+		})
+	})
+}
+
+func removeResourceStateByARN(arn string) error {
+	return writeState(func(st *state.State) { st.RemoveResourceByARN(arn) })
+}
+
+func currentUsername() string {
+	u, _ := user.Current()
+	if u == nil {
+		return "unknown"
+	}
+	return u.Username
 }
 
 // writeState loads the active context, acquires a lock, applies fn to state, and saves.
@@ -268,13 +322,16 @@ func writeState(fn func(*state.State)) error {
 	ctx := context.Background()
 
 	localCfg, err := localconfig.Load()
-	if err != nil || localCfg.CurrentContext == "" {
+	if err != nil {
+		return err
+	}
+	if localCfg.CurrentContext == "" && stateContext == "" {
 		return nil // no state configured, skip silently
 	}
 
 	_, activeCtx, err := localCfg.GetActiveContext(stateContext)
 	if err != nil {
-		return nil // context not found, skip silently
+		return err
 	}
 
 	backend, err := state.NewBackend(ctx, activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)

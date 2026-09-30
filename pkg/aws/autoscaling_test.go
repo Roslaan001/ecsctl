@@ -12,10 +12,14 @@ import (
 )
 
 type mockApplicationAutoScaling struct {
-	registerInput *applicationautoscaling.RegisterScalableTargetInput
-	registerErr   error
-	policyInput   *applicationautoscaling.PutScalingPolicyInput
-	policyErr     error
+	registerInput       *applicationautoscaling.RegisterScalableTargetInput
+	registerErr         error
+	policyInput         *applicationautoscaling.PutScalingPolicyInput
+	policyErr           error
+	targetsOut          *applicationautoscaling.DescribeScalableTargetsOutput
+	policiesOut         *applicationautoscaling.DescribeScalingPoliciesOutput
+	describeTargetCalls int
+	describePolicyCalls int
 }
 
 func (m *mockApplicationAutoScaling) RegisterScalableTarget(_ context.Context, input *applicationautoscaling.RegisterScalableTargetInput, _ ...func(*applicationautoscaling.Options)) (*applicationautoscaling.RegisterScalableTargetOutput, error) {
@@ -26,6 +30,22 @@ func (m *mockApplicationAutoScaling) RegisterScalableTarget(_ context.Context, i
 func (m *mockApplicationAutoScaling) PutScalingPolicy(_ context.Context, input *applicationautoscaling.PutScalingPolicyInput, _ ...func(*applicationautoscaling.Options)) (*applicationautoscaling.PutScalingPolicyOutput, error) {
 	m.policyInput = input
 	return &applicationautoscaling.PutScalingPolicyOutput{}, m.policyErr
+}
+
+func (m *mockApplicationAutoScaling) DescribeScalableTargets(_ context.Context, _ *applicationautoscaling.DescribeScalableTargetsInput, _ ...func(*applicationautoscaling.Options)) (*applicationautoscaling.DescribeScalableTargetsOutput, error) {
+	m.describeTargetCalls++
+	if m.targetsOut == nil {
+		return &applicationautoscaling.DescribeScalableTargetsOutput{}, nil
+	}
+	return m.targetsOut, nil
+}
+
+func (m *mockApplicationAutoScaling) DescribeScalingPolicies(_ context.Context, _ *applicationautoscaling.DescribeScalingPoliciesInput, _ ...func(*applicationautoscaling.Options)) (*applicationautoscaling.DescribeScalingPoliciesOutput, error) {
+	m.describePolicyCalls++
+	if m.policiesOut == nil {
+		return &applicationautoscaling.DescribeScalingPoliciesOutput{}, nil
+	}
+	return m.policiesOut, nil
 }
 
 func TestConfigureServiceAutoScalingDefaultsToCPU(t *testing.T) {
@@ -92,5 +112,21 @@ func TestConfigureServiceAutoScalingPropagatesFailures(t *testing.T) {
 	client.autoscaling = mock
 	if err := client.configureServiceAutoScaling(context.Background(), cfg); !errors.Is(err, policyErr) {
 		t.Fatalf("policy error = %v", err)
+	}
+}
+
+func TestServiceAutoScalingDriftIsFalseWhenTargetAndPolicyMatch(t *testing.T) {
+	mock := &mockApplicationAutoScaling{
+		targetsOut: &applicationautoscaling.DescribeScalableTargetsOutput{ScalableTargets: []types.ScalableTarget{{MinCapacity: awssdk.Int32(1), MaxCapacity: awssdk.Int32(5)}}},
+		policiesOut: &applicationautoscaling.DescribeScalingPoliciesOutput{ScalingPolicies: []types.ScalingPolicy{{TargetTrackingScalingPolicyConfiguration: &types.TargetTrackingScalingPolicyConfiguration{
+			TargetValue:                   awssdk.Float64(60),
+			PredefinedMetricSpecification: &types.PredefinedMetricSpecification{PredefinedMetricType: types.MetricTypeECSServiceAverageCPUUtilization},
+		}}}},
+	}
+	client := &Client{autoscaling: mock}
+	cfg := &ecscfg.ServiceConfig{Name: "api", Cluster: "cluster-a", AutoScaling: &ecscfg.ServiceAutoScalingConfig{MinCapacity: 1, MaxCapacity: 5}}
+	drift, err := client.serviceAutoScalingDrift(context.Background(), cfg)
+	if err != nil || drift {
+		t.Fatalf("serviceAutoScalingDrift() = (%v, %v), want (false, nil)", drift, err)
 	}
 }

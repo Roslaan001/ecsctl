@@ -24,6 +24,11 @@ environment:
   APP_ENV: production
 secrets:
   API_KEY: arn:aws:secretsmanager:us-east-1:123456789012:secret:agrogpt-api-key
+awsLogsConfiguration:
+  logGroup: /ecs/express/agrogpt-api
+  logStreamPrefix: app
+repositoryCredentials:
+  credentialsParameter: arn:aws:secretsmanager:us-east-1:123456789012:secret:ecr-pull
 tags:
   app: agrogpt
 ```
@@ -34,6 +39,8 @@ Create and wait for ECS to report the service active:
 ecsctl express create -f express.yaml --wait
 ```
 
+The same YAML can be reconciled with `ecsctl apply -f express.yaml`; apply creates the service when it is missing and updates it when it already exists. `ecsctl express list --cluster production` lists Express services in a cluster.
+
 For an existing task definition, replace the image/role/CPU/memory fields with `taskDefinitionArn`. Express services require an infrastructure role with permissions for the managed networking, load balancing, and scaling resources. Update a service using `ecsctl express update --service-arn <arn> -f express.yaml`; inspect or delete it with `ecsctl express describe` and `ecsctl express delete`.
 
 Supported operations:
@@ -43,4 +50,7 @@ ecsctl express create -f express.yaml [--wait]
 ecsctl express update --service-arn <arn> -f express.yaml [--wait]
 ecsctl express describe --service-arn <arn>
 ecsctl express delete --service-arn <arn>
+ecsctl express list [--cluster <name>]
 ```
+
+`ecsctl state import express <name-or-arn> --cluster <name>` records an existing Express service and captures its observed configuration. `ecsctl state config express <name> --cluster <name>` prints a stored configuration that you can save as a YAML starting point. The same `state config` command supports imported clusters and regular ECS services. Review imported values before committing them, especially environment values; use Secrets Manager references for secrets.

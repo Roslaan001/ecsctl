@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/applicationautoscaling"
+	applicationautoscalingTypes "github.com/aws/aws-sdk-go-v2/service/applicationautoscaling/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
@@ -21,6 +23,8 @@ type mockECS struct {
 	createClusterInput  *ecs.CreateClusterInput
 	describeServicesOut *ecs.DescribeServicesOutput
 	describeServicesErr error
+	listServicesIn      *ecs.ListServicesInput
+	listServicesOut     *ecs.ListServicesOutput
 	createServiceCalled bool
 	createServiceErr    error
 	createServiceInput  *ecs.CreateServiceInput
@@ -76,8 +80,12 @@ func (m *mockECS) DeleteService(_ context.Context, input *ecs.DeleteServiceInput
 func (m *mockECS) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
 	panic("unexpected: ListClusters")
 }
-func (m *mockECS) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
-	panic("unexpected: ListServices")
+func (m *mockECS) ListServices(_ context.Context, input *ecs.ListServicesInput, _ ...func(*ecs.Options)) (*ecs.ListServicesOutput, error) {
+	m.listServicesIn = input
+	if m.listServicesOut == nil {
+		return &ecs.ListServicesOutput{}, nil
+	}
+	return m.listServicesOut, nil
 }
 func (m *mockECS) UpdateService(_ context.Context, input *ecs.UpdateServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateServiceOutput, error) {
 	m.updateServiceInput = input
@@ -266,6 +274,48 @@ func TestCreateServiceMapsAdvancedConfiguration(t *testing.T) {
 	}
 	if in.ServiceConnectConfiguration == nil || !in.ServiceConnectConfiguration.Enabled {
 		t.Fatalf("Service Connect not mapped: %#v", in.ServiceConnectConfiguration)
+	}
+	if in.SchedulingStrategy != types.SchedulingStrategyReplica {
+		t.Fatalf("default scheduling strategy = %q", in.SchedulingStrategy)
+	}
+}
+
+func TestCreateDaemonServiceOmitsDesiredCount(t *testing.T) {
+	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{}}
+	cfg := &ecscfg.ServiceConfig{Name: "agent", Cluster: "prod", TaskDefinition: "agent:1", SchedulingStrategy: "DAEMON"}
+	if err := testClient(mock).CreateService(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	if mock.createServiceInput.SchedulingStrategy != types.SchedulingStrategyDaemon || mock.createServiceInput.DesiredCount != nil {
+		t.Fatalf("daemon service input = %#v", mock.createServiceInput)
+	}
+}
+
+func TestReconcileServiceDoesNotRepeatServiceConnectOrAutoscaling(t *testing.T) {
+	wantServiceConnect := toServiceConnect(&ecscfg.ServiceConnectConfig{Enabled: true, Namespace: "prod.local", Services: []ecscfg.ServiceConnectServiceConfig{{PortName: "http", DiscoveryName: "api"}}})
+	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{
+		ServiceName: aws.String("api"), TaskDefinition: aws.String("api:1"), Status: aws.String("ACTIVE"), DesiredCount: 1,
+		SchedulingStrategy: types.SchedulingStrategyReplica,
+		Deployments:        []types.Deployment{{Status: aws.String("PRIMARY"), ServiceConnectConfiguration: wantServiceConnect}},
+	}}}}
+	autoScaling := &mockApplicationAutoScaling{
+		targetsOut: &applicationautoscaling.DescribeScalableTargetsOutput{ScalableTargets: []applicationautoscalingTypes.ScalableTarget{{MinCapacity: aws.Int32(1), MaxCapacity: aws.Int32(5)}}},
+		policiesOut: &applicationautoscaling.DescribeScalingPoliciesOutput{ScalingPolicies: []applicationautoscalingTypes.ScalingPolicy{{TargetTrackingScalingPolicyConfiguration: &applicationautoscalingTypes.TargetTrackingScalingPolicyConfiguration{
+			TargetValue: aws.Float64(60), PredefinedMetricSpecification: &applicationautoscalingTypes.PredefinedMetricSpecification{PredefinedMetricType: applicationautoscalingTypes.MetricTypeECSServiceAverageCPUUtilization},
+		}}}},
+	}
+	client := testClient(mock)
+	client.autoscaling = autoScaling
+	cfg := &ecscfg.ServiceConfig{Name: "api", Cluster: "prod", TaskDefinition: "api:1", DesiredCount: 1,
+		ServiceConnect: &ecscfg.ServiceConnectConfig{Enabled: true, Namespace: "prod.local", Services: []ecscfg.ServiceConnectServiceConfig{{PortName: "http", DiscoveryName: "api"}}},
+		AutoScaling:    &ecscfg.ServiceAutoScalingConfig{MinCapacity: 1, MaxCapacity: 5},
+	}
+	changed, err := client.ReconcileService(context.Background(), cfg, false)
+	if err != nil || changed {
+		t.Fatalf("ReconcileService() = (%v, %v), want (false, nil)", changed, err)
+	}
+	if mock.updateServiceInput != nil || autoScaling.registerInput != nil || autoScaling.policyInput != nil {
+		t.Fatal("no-drift apply mutated the ECS service or autoscaling policy")
 	}
 }
 
