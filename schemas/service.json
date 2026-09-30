@@ -4,63 +4,49 @@
   "type": "object",
   "required": ["name", "cluster", "taskDefinition"],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Name of the ECS service."
-    },
-    "cluster": {
-      "type": "string",
-      "description": "Name of the ECS cluster to deploy into."
-    },
-    "taskDefinition": {
-      "type": "string",
-      "description": "Family and revision (e.g. family:rev) or full ARN of the task definition."
-    },
-    "launchType": {
-      "type": "string",
-      "enum": ["FARGATE", "EC2"],
-      "default": "FARGATE",
-      "description": "Launch type for the service."
-    },
-    "desiredCount": {
-      "type": "integer",
-      "minimum": 0,
-      "default": 1,
-      "description": "Number of tasks to keep running."
-    },
+    "name": { "type": "string", "description": "Name of the ECS service." },
+    "cluster": { "type": "string", "description": "Name of the ECS cluster." },
+    "taskDefinition": { "type": "string", "description": "Task definition family:revision or ARN." },
+    "launchType": { "type": "string", "enum": ["FARGATE", "EC2"], "default": "FARGATE" },
+    "desiredCount": { "type": "integer", "minimum": 0, "default": 1 },
     "network": {
       "type": "object",
       "properties": {
-        "subnets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of subnet IDs."
-        },
-        "securityGroups": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of security group IDs."
-        },
-        "assignPublicIp": {
-          "type": "string",
-          "enum": ["ENABLED", "DISABLED"],
-          "default": "ENABLED",
-          "description": "Whether to assign a public IP address."
-        }
+        "subnets": { "type": "array", "items": { "type": "string" } },
+        "securityGroups": { "type": "array", "items": { "type": "string" } },
+        "assignPublicIp": { "type": "string", "enum": ["ENABLED", "DISABLED"] }
       },
       "additionalProperties": false
     },
-    "tags": {
+    "capacityProviderStrategy": { "type": "array", "items": { "$ref": "#/definitions/capacityProvider" } },
+    "deploymentController": { "type": "object", "properties": { "type": { "enum": ["ECS", "CODE_DEPLOY", "EXTERNAL"] } }, "required": ["type"], "additionalProperties": false },
+    "deploymentConfiguration": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string"
+      "properties": {
+        "maximumPercent": { "type": "integer", "minimum": 0 },
+        "minimumHealthyPercent": { "type": "integer", "minimum": 0 },
+        "strategy": { "type": "string", "enum": ["ROLLING", "BLUE_GREEN"] },
+        "bakeTimeInMinutes": { "type": "integer", "minimum": 0 },
+        "deploymentCircuitBreaker": { "type": "object", "properties": { "enable": { "type": "boolean" }, "rollback": { "type": "boolean" } }, "required": ["enable", "rollback"], "additionalProperties": false },
+        "alarms": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "enable": { "type": "boolean" }, "rollback": { "type": "boolean" } }, "required": ["name", "enable", "rollback"], "additionalProperties": false } }
       },
-      "description": "Key-value pairs for resource tags."
-    }
+      "additionalProperties": false
+    },
+    "loadBalancers": { "type": "array", "items": { "type": "object", "properties": { "targetGroupArn": { "type": "string" }, "containerName": { "type": "string" }, "containerPort": { "type": "integer" } }, "required": ["targetGroupArn", "containerName", "containerPort"], "additionalProperties": false } },
+    "serviceRegistries": { "type": "array", "items": { "type": "object", "properties": { "registryArn": { "type": "string" }, "port": { "type": "integer" }, "containerName": { "type": "string" }, "containerPort": { "type": "integer" } }, "required": ["registryArn"], "additionalProperties": false } },
+    "healthCheckGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+    "enableExecuteCommand": { "type": "boolean" },
+    "enableECSManagedTags": { "type": "boolean" },
+    "propagateTags": { "type": "string", "enum": ["SERVICE", "TASK_DEFINITION"] },
+    "platformVersion": { "type": "string" },
+    "placementConstraints": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "expression": { "type": "string" } }, "required": ["type"], "additionalProperties": false } },
+    "placementStrategy": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "field": { "type": "string" } }, "required": ["type"], "additionalProperties": false } },
+    "serviceConnect": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "namespace": { "type": "string" }, "services": { "type": "array", "items": { "type": "object", "properties": { "portName": { "type": "string" }, "discoveryName": { "type": "string" }, "ingressPortOverride": { "type": "integer" }, "clientAliases": { "type": "array", "items": { "type": "object", "properties": { "dnsName": { "type": "string" }, "port": { "type": "integer" } }, "required": ["port"], "additionalProperties": false } } }, "required": ["portName"], "additionalProperties": false } } }, "required": ["enabled"], "additionalProperties": false },
+    "autoScaling": { "type": "object", "properties": { "minCapacity": { "type": "integer", "minimum": 0 }, "maxCapacity": { "type": "integer", "minimum": 1 }, "metric": { "type": "string", "enum": ["CPU", "Memory"] }, "targetValue": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["minCapacity", "maxCapacity"], "additionalProperties": false },
+    "tags": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "definitions": {
+    "capacityProvider": { "type": "object", "properties": { "capacityProvider": { "type": "string" }, "weight": { "type": "integer", "minimum": 0 }, "base": { "type": "integer", "minimum": 0 } }, "required": ["capacityProvider"], "additionalProperties": false }
   },
   "additionalProperties": false
 }

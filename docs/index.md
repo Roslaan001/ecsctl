@@ -12,7 +12,9 @@
 ## Key Features
 
 * 🚀 **Declarative Resource Management**: Create, update, or reconcile ECS clusters and services using GitOps-friendly YAML configurations (with support for `--dry-run` and `--wait`).
-* ⚡ **Imperative Operations**: Stream logs in real-time (`ecsctl logs`), open interactive shells inside containers (`ecsctl exec`), deploy new container images (`ecsctl deploy`), and scale services (`ecsctl scale`).
+* ⚡ **Imperative Operations**: Stream logs across service tasks (`ecsctl logs`), open interactive shells (`ecsctl exec`), deploy images while preserving task-definition settings (`ecsctl deploy`), and run or stop standalone tasks.
+* 🚀 **Express Mode**: Create, update, inspect, and delete ECS Express Mode services with managed ingress and scaling (`ecsctl express`).
+* 📈 **Service Controls**: Reconcile capacity providers, deployment safety, load balancing, Service Connect, tags, placement, ECS Exec, and Application Auto Scaling from YAML.
 * 📊 **Inspection & Querying**: Fast listing (`ecsctl list`) and detailed descriptions (`ecsctl describe`) of ECS clusters, services, and tasks.
 * 🔒 **Remote State Backend**: Track your ecsctl-managed resources in an S3-based remote state context manager, similar to Terraform, supporting context switching (`ecsctl state`).
 * 🔑 **Native AWS Auth**: Integrates natively with the standard AWS credential chain (`~/.aws/credentials`, IAM roles, environment variables).

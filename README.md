@@ -123,6 +123,31 @@ ecsctl create cluster --name my-cluster --region us-east-1
 ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3
 ```
 
+ECS service YAML can also configure capacity-provider strategies, deployment controllers and safety settings, load balancers, Service Connect, placement, ECS Exec, tags, and Application Auto Scaling. See [the declarative configuration guide](docs/declarative.md).
+
+### ECS Express Mode
+
+Create an Express Mode service, which lets ECS provision and manage its ingress, load balancer, scaling, logging, and alarms:
+
+```bash
+ecsctl express create -f express.yaml --wait
+ecsctl express describe --service-arn "$SERVICE_ARN"
+```
+
+See the [Express Mode guide](docs/express.md) for the role requirements and YAML fields.
+
+### Task definitions and one-off tasks
+
+Register a task definition JSON file and run or stop standalone Fargate tasks:
+
+```bash
+ecsctl register task-definition -f task-definition.json
+ecsctl run-task --cluster my-cluster --task-definition batch:1 --subnets subnet-a --security-groups sg-a
+ecsctl stop-task --cluster my-cluster --task <task-id-or-arn>
+```
+
+See [the task guide](docs/tasks.md) for details.
+
 ### 3. Delete
 
 Delete active clusters or services:

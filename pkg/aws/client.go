@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/applicationautoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -24,6 +26,10 @@ type ecsIface interface {
 	DescribeClusters(ctx context.Context, params *ecs.DescribeClustersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error)
 	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
 	CreateService(ctx context.Context, params *ecs.CreateServiceInput, optFns ...func(*ecs.Options)) (*ecs.CreateServiceOutput, error)
+	CreateExpressGatewayService(ctx context.Context, params *ecs.CreateExpressGatewayServiceInput, optFns ...func(*ecs.Options)) (*ecs.CreateExpressGatewayServiceOutput, error)
+	UpdateExpressGatewayService(ctx context.Context, params *ecs.UpdateExpressGatewayServiceInput, optFns ...func(*ecs.Options)) (*ecs.UpdateExpressGatewayServiceOutput, error)
+	DescribeExpressGatewayService(ctx context.Context, params *ecs.DescribeExpressGatewayServiceInput, optFns ...func(*ecs.Options)) (*ecs.DescribeExpressGatewayServiceOutput, error)
+	DeleteExpressGatewayService(ctx context.Context, params *ecs.DeleteExpressGatewayServiceInput, optFns ...func(*ecs.Options)) (*ecs.DeleteExpressGatewayServiceOutput, error)
 	DeleteService(ctx context.Context, params *ecs.DeleteServiceInput, optFns ...func(*ecs.Options)) (*ecs.DeleteServiceOutput, error)
 	DescribeServices(ctx context.Context, params *ecs.DescribeServicesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error)
 	ListServices(ctx context.Context, params *ecs.ListServicesInput, optFns ...func(*ecs.Options)) (*ecs.ListServicesOutput, error)
@@ -33,12 +39,17 @@ type ecsIface interface {
 	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
 	ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error)
 	ExecuteCommand(ctx context.Context, params *ecs.ExecuteCommandInput, optFns ...func(*ecs.Options)) (*ecs.ExecuteCommandOutput, error)
+	RunTask(ctx context.Context, params *ecs.RunTaskInput, optFns ...func(*ecs.Options)) (*ecs.RunTaskOutput, error)
+	StopTask(ctx context.Context, params *ecs.StopTaskInput, optFns ...func(*ecs.Options)) (*ecs.StopTaskOutput, error)
+	TagResource(ctx context.Context, params *ecs.TagResourceInput, optFns ...func(*ecs.Options)) (*ecs.TagResourceOutput, error)
+	UntagResource(ctx context.Context, params *ecs.UntagResourceInput, optFns ...func(*ecs.Options)) (*ecs.UntagResourceOutput, error)
 }
 
 // Client wraps the AWS ECS and CloudWatch Logs SDK clients.
 type Client struct {
-	ecs  ecsIface
-	logs *cloudwatchlogs.Client
+	ecs         ecsIface
+	logs        *cloudwatchlogs.Client
+	autoscaling *applicationautoscaling.Client
 }
 
 // LogsOptions holds options for fetching logs.
@@ -59,6 +70,47 @@ type ExecOptions struct {
 	Command   string
 }
 
+type RunTaskOptions struct {
+	Cluster        string
+	TaskDefinition string
+	Count          int32
+	Subnets        []string
+	SecurityGroups []string
+	AssignPublicIP string
+}
+
+func (c *Client) RegisterTaskDefinition(ctx context.Context, input *ecs.RegisterTaskDefinitionInput) (string, error) {
+	out, err := c.ecs.RegisterTaskDefinition(ctx, input)
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(out.TaskDefinition.TaskDefinitionArn), nil
+}
+
+func (c *Client) RunTask(ctx context.Context, opts RunTaskOptions) ([]string, error) {
+	input := &ecs.RunTaskInput{Cluster: aws.String(opts.Cluster), TaskDefinition: aws.String(opts.TaskDefinition), Count: aws.Int32(opts.Count), LaunchType: types.LaunchTypeFargate}
+	if len(opts.Subnets) > 0 || len(opts.SecurityGroups) > 0 {
+		input.NetworkConfiguration = &types.NetworkConfiguration{AwsvpcConfiguration: &types.AwsVpcConfiguration{Subnets: opts.Subnets, SecurityGroups: opts.SecurityGroups, AssignPublicIp: types.AssignPublicIp(opts.AssignPublicIP)}}
+	}
+	out, err := c.ecs.RunTask(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if len(out.Failures) > 0 {
+		return nil, fmt.Errorf("running task failed: %s: %s", aws.ToString(out.Failures[0].Arn), aws.ToString(out.Failures[0].Reason))
+	}
+	arns := make([]string, 0, len(out.Tasks))
+	for _, task := range out.Tasks {
+		arns = append(arns, aws.ToString(task.TaskArn))
+	}
+	return arns, nil
+}
+
+func (c *Client) StopTask(ctx context.Context, cluster, taskARN, reason string) error {
+	_, err := c.ecs.StopTask(ctx, &ecs.StopTaskInput{Cluster: aws.String(cluster), Task: aws.String(taskARN), Reason: aws.String(reason)})
+	return err
+}
+
 // NewECSClient creates a new AWS client using the given region and profile.
 // If region or profile are empty, the SDK falls back to env vars / shared config.
 func NewECSClient(ctx context.Context, region, profile string) (*Client, error) {
@@ -77,8 +129,9 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 	}
 
 	return &Client{
-		ecs:  ecs.NewFromConfig(cfg),
-		logs: cloudwatchlogs.NewFromConfig(cfg),
+		ecs:         ecs.NewFromConfig(cfg),
+		logs:        cloudwatchlogs.NewFromConfig(cfg),
+		autoscaling: applicationautoscaling.NewFromConfig(cfg),
 	}, nil
 }
 
@@ -107,6 +160,10 @@ func (c *Client) CreateCluster(ctx context.Context, cfg *ecscfg.ClusterConfig) e
 	// the service-linked role assumption that can fail on fresh accounts.
 	if len(cfg.CapacityProviders) > 0 {
 		input.CapacityProviders = cfg.CapacityProviders
+	}
+	input.DefaultCapacityProviderStrategy = toCapacityProviderStrategy(cfg.DefaultCapacityProviderStrategy)
+	if cfg.ServiceConnectDefaultsNamespace != "" {
+		input.ServiceConnectDefaults = &types.ClusterServiceConnectDefaultsRequest{Namespace: aws.String(cfg.ServiceConnectDefaultsNamespace)}
 	}
 
 	_, err = c.ecs.CreateCluster(ctx, input)
@@ -181,11 +238,38 @@ func (c *Client) CreateService(ctx context.Context, cfg *ecscfg.ServiceConfig) e
 	}
 
 	input := &ecs.CreateServiceInput{
-		Cluster:        aws.String(cfg.Cluster),
-		ServiceName:    aws.String(cfg.Name),
-		TaskDefinition: aws.String(cfg.TaskDefinition),
-		DesiredCount:   aws.Int32(cfg.DesiredCount),
-		LaunchType:     types.LaunchType(cfg.LaunchType),
+		Cluster:                  aws.String(cfg.Cluster),
+		ServiceName:              aws.String(cfg.Name),
+		TaskDefinition:           aws.String(cfg.TaskDefinition),
+		DesiredCount:             aws.Int32(cfg.DesiredCount),
+		LaunchType:               types.LaunchType(cfg.LaunchType),
+		CapacityProviderStrategy: toCapacityProviderStrategy(cfg.CapacityProviderStrategy),
+		DeploymentController:     toDeploymentController(cfg.DeploymentController),
+		DeploymentConfiguration:  toDeploymentConfiguration(cfg.DeploymentConfiguration),
+		LoadBalancers:            toLoadBalancers(cfg.LoadBalancers),
+		ServiceRegistries:        toServiceRegistries(cfg.ServiceRegistries),
+		PlacementConstraints:     toPlacementConstraints(cfg.PlacementConstraints),
+		PlacementStrategy:        toPlacementStrategies(cfg.PlacementStrategy),
+		Tags:                     toECSTags(cfg.Tags),
+		PropagateTags:            types.PropagateTags(cfg.PropagateTags),
+	}
+	if cfg.EnableECSManagedTags != nil {
+		input.EnableECSManagedTags = *cfg.EnableECSManagedTags
+	}
+	if len(cfg.CapacityProviderStrategy) > 0 {
+		input.LaunchType = ""
+	}
+	if cfg.EnableExecuteCommand != nil {
+		input.EnableExecuteCommand = *cfg.EnableExecuteCommand
+	}
+	if cfg.HealthCheckGracePeriodSeconds > 0 {
+		input.HealthCheckGracePeriodSeconds = aws.Int32(cfg.HealthCheckGracePeriodSeconds)
+	}
+	if cfg.PlatformVersion != "" {
+		input.PlatformVersion = aws.String(cfg.PlatformVersion)
+	}
+	if cfg.ServiceConnect != nil {
+		input.ServiceConnectConfiguration = toServiceConnect(cfg.ServiceConnect)
 	}
 
 	if cfg.NetworkConfig != nil {
@@ -199,7 +283,140 @@ func (c *Client) CreateService(ctx context.Context, cfg *ecscfg.ServiceConfig) e
 	}
 
 	_, err = c.ecs.CreateService(ctx, input)
-	return err
+	if err != nil {
+		return err
+	}
+	if cfg.AutoScaling != nil {
+		if err := c.configureServiceAutoScaling(ctx, cfg); err != nil {
+			return fmt.Errorf("service created but configuring auto scaling failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func toCapacityProviderStrategy(items []ecscfg.CapacityProviderStrategyConfig) []types.CapacityProviderStrategyItem {
+	out := make([]types.CapacityProviderStrategyItem, 0, len(items))
+	for _, item := range items {
+		v := types.CapacityProviderStrategyItem{CapacityProvider: aws.String(item.CapacityProvider)}
+		if item.Weight > 0 {
+			v.Weight = item.Weight
+		}
+		if item.Base > 0 {
+			v.Base = item.Base
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func toDeploymentController(cfg *ecscfg.DeploymentControllerConfig) *types.DeploymentController {
+	if cfg == nil {
+		return nil
+	}
+	return &types.DeploymentController{Type: types.DeploymentControllerType(cfg.Type)}
+}
+
+func toDeploymentConfiguration(cfg *ecscfg.DeploymentConfigurationConfig) *types.DeploymentConfiguration {
+	if cfg == nil {
+		return nil
+	}
+	out := &types.DeploymentConfiguration{}
+	if cfg.MaximumPercent > 0 {
+		out.MaximumPercent = aws.Int32(cfg.MaximumPercent)
+	}
+	if cfg.MinimumHealthyPercent > 0 {
+		out.MinimumHealthyPercent = aws.Int32(cfg.MinimumHealthyPercent)
+	}
+	if cfg.DeploymentCircuitBreaker != nil {
+		out.DeploymentCircuitBreaker = &types.DeploymentCircuitBreaker{Enable: cfg.DeploymentCircuitBreaker.Enable, Rollback: cfg.DeploymentCircuitBreaker.Rollback}
+	}
+	if len(cfg.Alarms) > 0 {
+		alarms := &types.DeploymentAlarms{}
+		for _, item := range cfg.Alarms {
+			alarms.AlarmNames = append(alarms.AlarmNames, item.Name)
+			alarms.Enable = item.Enable
+			alarms.Rollback = item.Rollback
+		}
+		out.Alarms = alarms
+	}
+	if cfg.Strategy != "" {
+		out.Strategy = types.DeploymentStrategy(cfg.Strategy)
+	}
+	if cfg.BakeTimeInMinutes > 0 {
+		out.BakeTimeInMinutes = aws.Int32(cfg.BakeTimeInMinutes)
+	}
+	return out
+}
+
+func toLoadBalancers(items []ecscfg.LoadBalancerConfig) []types.LoadBalancer {
+	out := make([]types.LoadBalancer, 0, len(items))
+	for _, item := range items {
+		out = append(out, types.LoadBalancer{TargetGroupArn: aws.String(item.TargetGroupARN), ContainerName: aws.String(item.ContainerName), ContainerPort: aws.Int32(item.ContainerPort)})
+	}
+	return out
+}
+
+func toServiceRegistries(items []ecscfg.ServiceRegistryConfig) []types.ServiceRegistry {
+	out := make([]types.ServiceRegistry, 0, len(items))
+	for _, item := range items {
+		v := types.ServiceRegistry{RegistryArn: aws.String(item.RegistryARN)}
+		if item.Port > 0 {
+			v.Port = aws.Int32(item.Port)
+		}
+		if item.ContainerName != "" {
+			v.ContainerName = aws.String(item.ContainerName)
+		}
+		if item.ContainerPort > 0 {
+			v.ContainerPort = aws.Int32(item.ContainerPort)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func toPlacementConstraints(items []ecscfg.PlacementConstraintConfig) []types.PlacementConstraint {
+	out := make([]types.PlacementConstraint, 0, len(items))
+	for _, item := range items {
+		v := types.PlacementConstraint{Type: types.PlacementConstraintType(item.Type)}
+		if item.Expression != "" {
+			v.Expression = aws.String(item.Expression)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func toPlacementStrategies(items []ecscfg.PlacementStrategyConfig) []types.PlacementStrategy {
+	out := make([]types.PlacementStrategy, 0, len(items))
+	for _, item := range items {
+		v := types.PlacementStrategy{Type: types.PlacementStrategyType(item.Type)}
+		if item.Field != "" {
+			v.Field = aws.String(item.Field)
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+func toServiceConnect(cfg *ecscfg.ServiceConnectConfig) *types.ServiceConnectConfiguration {
+	out := &types.ServiceConnectConfiguration{Enabled: cfg.Enabled}
+	if cfg.Namespace != "" {
+		out.Namespace = aws.String(cfg.Namespace)
+	}
+	for _, item := range cfg.Services {
+		svc := types.ServiceConnectService{PortName: aws.String(item.PortName)}
+		if item.DiscoveryName != "" {
+			svc.DiscoveryName = aws.String(item.DiscoveryName)
+		}
+		if item.IngressPortOverride > 0 {
+			svc.IngressPortOverride = aws.Int32(item.IngressPortOverride)
+		}
+		for _, alias := range item.ClientAliases {
+			svc.ClientAliases = append(svc.ClientAliases, types.ServiceConnectClientAlias{DnsName: aws.String(alias.DNSName), Port: aws.Int32(alias.Port)})
+		}
+		out.Services = append(out.Services, svc)
+	}
+	return out
 }
 
 // DeleteService drains and deletes an ECS service.
@@ -249,6 +466,7 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 	// 2. Describe the task definition
 	tdOut, err := c.ecs.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: aws.String(currentTaskDef),
+		Include:        []types.TaskDefinitionField{types.TaskDefinitionFieldTags},
 	})
 	if err != nil {
 		return "", fmt.Errorf("describing task definition: %w", err)
@@ -275,12 +493,20 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 		Family:                  td.Family,
 		ContainerDefinitions:    containers,
 		Cpu:                     td.Cpu,
+		EnableFaultInjection:    td.EnableFaultInjection,
+		EphemeralStorage:        td.EphemeralStorage,
 		Memory:                  td.Memory,
 		NetworkMode:             td.NetworkMode,
+		IpcMode:                 td.IpcMode,
+		PidMode:                 td.PidMode,
 		RequiresCompatibilities: td.RequiresCompatibilities,
 		ExecutionRoleArn:        td.ExecutionRoleArn,
 		TaskRoleArn:             td.TaskRoleArn,
 		Volumes:                 td.Volumes,
+		PlacementConstraints:    td.PlacementConstraints,
+		ProxyConfiguration:      td.ProxyConfiguration,
+		RuntimePlatform:         td.RuntimePlatform,
+		Tags:                    tdOut.Tags,
 	})
 	if err != nil {
 		return "", fmt.Errorf("registering task definition: %w", err)
@@ -430,35 +656,39 @@ func (c *Client) FetchLogs(ctx context.Context, opts LogsOptions, tail int) erro
 	if err != nil || len(listOut.TaskArns) == 0 {
 		return fmt.Errorf("no running tasks found for service %q", opts.Service)
 	}
-	// Extract task ID from the last segment of the ARN (after the final '/')
-	taskARN := listOut.TaskArns[0]
-	taskID := taskARN
-	if parts := strings.Split(taskARN, "/"); len(parts) > 1 {
-		taskID = parts[len(parts)-1]
+	// ECS awslogs streams are named <prefix>/<container>/<task-id>. Read every
+	// task in the service so a scaled service does not silently hide logs.
+	logStreams := make([]string, 0, len(listOut.TaskArns))
+	for _, taskARN := range listOut.TaskArns {
+		taskID := taskARN
+		if parts := strings.Split(taskARN, "/"); len(parts) > 1 {
+			taskID = parts[len(parts)-1]
+		}
+		logStreams = append(logStreams, fmt.Sprintf("%s/%s/%s", streamPrefix, containerName, taskID))
 	}
-
-	logStreamName := fmt.Sprintf("%s/%s/%s", streamPrefix, containerName, taskID)
 
 	if !opts.Tail {
 		// One-shot fetch
-		out, err := c.logs.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
-			LogGroupName:  aws.String(logGroup),
-			LogStreamName: aws.String(logStreamName),
-			Limit:         aws.Int32(int32(tail)),
-			StartFromHead: aws.Bool(false),
-		})
-		if err != nil {
-			return fmt.Errorf("fetching logs: %w", err)
-		}
-		for _, event := range out.Events {
-			fmt.Println(aws.ToString(event.Message))
+		for _, stream := range logStreams {
+			out, err := c.logs.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
+				LogGroupName:  aws.String(logGroup),
+				LogStreamName: aws.String(stream),
+				Limit:         aws.Int32(int32(tail)),
+				StartFromHead: aws.Bool(false),
+			})
+			if err != nil {
+				return fmt.Errorf("fetching logs from %s: %w", stream, err)
+			}
+			for _, event := range out.Events {
+				fmt.Printf("%s %s\n", time.UnixMilli(aws.ToInt64(event.Timestamp)).Format(time.RFC3339), aws.ToString(event.Message))
+			}
 		}
 		return nil
 	}
 
 	// --follow: stream continuously using nextForwardToken
 	fmt.Fprintf(os.Stderr, "Streaming logs for %s/%s (Ctrl+C to stop)...\n", opts.Service, containerName)
-	var nextToken *string
+	nextTokens := make(map[string]*string, len(logStreams))
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
@@ -467,30 +697,24 @@ func (c *Client) FetchLogs(ctx context.Context, opts LogsOptions, tail int) erro
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			input := &cloudwatchlogs.GetLogEventsInput{
-				LogGroupName:  aws.String(logGroup),
-				LogStreamName: aws.String(logStreamName),
-				StartFromHead: aws.Bool(false),
-			}
-			if nextToken != nil {
-				input.NextToken = nextToken
-			} else {
-				// First call — start from the tail
-				input.Limit = aws.Int32(int32(tail))
-			}
-
-			out, err := c.logs.GetLogEvents(ctx, input)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
-				continue
-			}
-			for _, event := range out.Events {
-				fmt.Println(aws.ToString(event.Message))
-			}
-			// Only advance the token when new events came in; otherwise
-			// CloudWatch returns the same token and we'd loop forever.
-			if out.NextForwardToken != nil && (nextToken == nil || *out.NextForwardToken != *nextToken) {
-				nextToken = out.NextForwardToken
+			for _, stream := range logStreams {
+				input := &cloudwatchlogs.GetLogEventsInput{LogGroupName: aws.String(logGroup), LogStreamName: aws.String(stream), StartFromHead: aws.Bool(false)}
+				if nextTokens[stream] != nil {
+					input.NextToken = nextTokens[stream]
+				} else {
+					input.Limit = aws.Int32(int32(tail))
+				}
+				out, err := c.logs.GetLogEvents(ctx, input)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: %s: %v\n", stream, err)
+					continue
+				}
+				for _, event := range out.Events {
+					fmt.Printf("%s %s\n", time.UnixMilli(aws.ToInt64(event.Timestamp)).Format(time.RFC3339), aws.ToString(event.Message))
+				}
+				if out.NextForwardToken != nil && (nextTokens[stream] == nil || *out.NextForwardToken != *nextTokens[stream]) {
+					nextTokens[stream] = out.NextForwardToken
+				}
 			}
 		}
 	}
@@ -787,6 +1011,7 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 	out, err := c.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  aws.String(cfg.Cluster),
 		Services: []string{cfg.Name},
+		Include:  []types.ServiceField{types.ServiceFieldTags},
 	})
 	if err != nil || len(out.Services) == 0 {
 		return false, fmt.Errorf("describing service: %w", err)
@@ -799,24 +1024,157 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 		Service: aws.String(cfg.Name),
 	}
 
-	if svc.DesiredCount != cfg.DesiredCount {
+	if cfg.AutoScaling == nil && svc.DesiredCount != cfg.DesiredCount {
 		fmt.Printf("  desiredCount: %d → %d\n", svc.DesiredCount, cfg.DesiredCount)
 		updateInput.DesiredCount = aws.Int32(cfg.DesiredCount)
+		changed = true
+	}
+	if taskDefinitionRef(aws.ToString(svc.TaskDefinition)) != taskDefinitionRef(cfg.TaskDefinition) {
+		fmt.Printf("  taskDefinition: %s → %s\n", aws.ToString(svc.TaskDefinition), cfg.TaskDefinition)
+		updateInput.TaskDefinition = aws.String(cfg.TaskDefinition)
+		changed = true
+	}
+	if cfg.DeploymentController != nil && !reflect.DeepEqual(svc.DeploymentController, toDeploymentController(cfg.DeploymentController)) {
+		updateInput.DeploymentController = toDeploymentController(cfg.DeploymentController)
+		changed = true
+	}
+	if cfg.DeploymentConfiguration != nil && !reflect.DeepEqual(svc.DeploymentConfiguration, toDeploymentConfiguration(cfg.DeploymentConfiguration)) {
+		updateInput.DeploymentConfiguration = toDeploymentConfiguration(cfg.DeploymentConfiguration)
+		changed = true
+	}
+	if len(cfg.CapacityProviderStrategy) > 0 && !reflect.DeepEqual(svc.CapacityProviderStrategy, toCapacityProviderStrategy(cfg.CapacityProviderStrategy)) {
+		updateInput.CapacityProviderStrategy = toCapacityProviderStrategy(cfg.CapacityProviderStrategy)
+		changed = true
+	}
+	if cfg.NetworkConfig != nil {
+		want := &types.NetworkConfiguration{AwsvpcConfiguration: &types.AwsVpcConfiguration{Subnets: cfg.NetworkConfig.Subnets, SecurityGroups: cfg.NetworkConfig.SecurityGroups, AssignPublicIp: types.AssignPublicIp(cfg.NetworkConfig.AssignPublicIP)}}
+		if !reflect.DeepEqual(svc.NetworkConfiguration, want) {
+			updateInput.NetworkConfiguration = want
+			changed = true
+		}
+	}
+	if len(cfg.LoadBalancers) > 0 && !reflect.DeepEqual(svc.LoadBalancers, toLoadBalancers(cfg.LoadBalancers)) {
+		updateInput.LoadBalancers = toLoadBalancers(cfg.LoadBalancers)
+		changed = true
+	}
+	if len(cfg.ServiceRegistries) > 0 && !reflect.DeepEqual(svc.ServiceRegistries, toServiceRegistries(cfg.ServiceRegistries)) {
+		updateInput.ServiceRegistries = toServiceRegistries(cfg.ServiceRegistries)
+		changed = true
+	}
+	if len(cfg.PlacementConstraints) > 0 && !reflect.DeepEqual(svc.PlacementConstraints, toPlacementConstraints(cfg.PlacementConstraints)) {
+		updateInput.PlacementConstraints = toPlacementConstraints(cfg.PlacementConstraints)
+		changed = true
+	}
+	if len(cfg.PlacementStrategy) > 0 && !reflect.DeepEqual(svc.PlacementStrategy, toPlacementStrategies(cfg.PlacementStrategy)) {
+		updateInput.PlacementStrategy = toPlacementStrategies(cfg.PlacementStrategy)
+		changed = true
+	}
+	if cfg.ServiceConnect != nil {
+		updateInput.ServiceConnectConfiguration = toServiceConnect(cfg.ServiceConnect)
+		changed = true
+	}
+	if cfg.EnableExecuteCommand != nil && svc.EnableExecuteCommand != *cfg.EnableExecuteCommand {
+		updateInput.EnableExecuteCommand = cfg.EnableExecuteCommand
+		changed = true
+	}
+	if cfg.HealthCheckGracePeriodSeconds > 0 && aws.ToInt32(svc.HealthCheckGracePeriodSeconds) != cfg.HealthCheckGracePeriodSeconds {
+		updateInput.HealthCheckGracePeriodSeconds = aws.Int32(cfg.HealthCheckGracePeriodSeconds)
+		changed = true
+	}
+	if cfg.PlatformVersion != "" && aws.ToString(svc.PlatformVersion) != cfg.PlatformVersion {
+		updateInput.PlatformVersion = aws.String(cfg.PlatformVersion)
+		changed = true
+	}
+	if cfg.PropagateTags != "" && string(svc.PropagateTags) != cfg.PropagateTags {
+		updateInput.PropagateTags = types.PropagateTags(cfg.PropagateTags)
+		changed = true
+	}
+	if cfg.EnableECSManagedTags != nil && *cfg.EnableECSManagedTags != svc.EnableECSManagedTags {
+		updateInput.EnableECSManagedTags = cfg.EnableECSManagedTags
+		changed = true
+	}
+	if cfg.Tags != nil && !tagsEqual(svc.Tags, cfg.Tags) {
+		changed = true
+	}
+	if cfg.AutoScaling != nil {
 		changed = true
 	}
 
 	if changed {
 		if dryRun {
-			fmt.Printf("[dry-run] Would update service %q desiredCount to %d\n", cfg.Name, cfg.DesiredCount)
+			fmt.Printf("[dry-run] Would reconcile configured fields for service %q.\n", cfg.Name)
 		} else {
-			if _, err := c.ecs.UpdateService(ctx, updateInput); err != nil {
-				return false, fmt.Errorf("updating service: %w", err)
+			if updateInput.DesiredCount != nil || updateInput.TaskDefinition != nil || updateInput.DeploymentController != nil || updateInput.DeploymentConfiguration != nil || updateInput.CapacityProviderStrategy != nil || updateInput.NetworkConfiguration != nil || updateInput.LoadBalancers != nil || updateInput.ServiceRegistries != nil || updateInput.PlacementConstraints != nil || updateInput.PlacementStrategy != nil || updateInput.ServiceConnectConfiguration != nil || updateInput.EnableExecuteCommand != nil || updateInput.HealthCheckGracePeriodSeconds != nil || updateInput.PlatformVersion != nil || updateInput.PropagateTags != "" || updateInput.EnableECSManagedTags != nil {
+				if _, err := c.ecs.UpdateService(ctx, updateInput); err != nil {
+					return false, fmt.Errorf("updating service: %w", err)
+				}
+			}
+			if cfg.Tags != nil && !tagsEqual(svc.Tags, cfg.Tags) {
+				if err := c.reconcileTags(ctx, aws.ToString(svc.ServiceArn), svc.Tags, cfg.Tags); err != nil {
+					return false, fmt.Errorf("reconciling service tags: %w", err)
+				}
+			}
+			if cfg.AutoScaling != nil {
+				if err := c.configureServiceAutoScaling(ctx, cfg); err != nil {
+					return false, fmt.Errorf("configuring service auto scaling: %w", err)
+				}
 			}
 			fmt.Printf("✓ Service %q updated.\n", cfg.Name)
 		}
 	}
 
 	return changed, nil
+}
+
+func taskDefinitionRef(value string) string {
+	if slash := strings.LastIndex(value, "/"); slash >= 0 {
+		return value[slash+1:]
+	}
+	return value
+}
+
+func tagsEqual(current []types.Tag, desired map[string]string) bool {
+	if len(current) != len(desired) {
+		return false
+	}
+	for _, tag := range current {
+		if desired[aws.ToString(tag.Key)] != aws.ToString(tag.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Client) reconcileTags(ctx context.Context, arn string, current []types.Tag, desired map[string]string) error {
+	var remove []string
+	for _, tag := range current {
+		if _, ok := desired[aws.ToString(tag.Key)]; !ok {
+			remove = append(remove, aws.ToString(tag.Key))
+		}
+	}
+	if len(remove) > 0 {
+		if _, err := c.ecs.UntagResource(ctx, &ecs.UntagResourceInput{ResourceArn: aws.String(arn), TagKeys: remove}); err != nil {
+			return err
+		}
+	}
+	var add []types.Tag
+	for key, value := range desired {
+		found := false
+		for _, tag := range current {
+			if aws.ToString(tag.Key) == key && aws.ToString(tag.Value) == value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			add = append(add, types.Tag{Key: aws.String(key), Value: aws.String(value)})
+		}
+	}
+	if len(add) > 0 {
+		_, err := c.ecs.TagResource(ctx, &ecs.TagResourceInput{ResourceArn: aws.String(arn), Tags: add})
+		return err
+	}
+	return nil
 }
 
 // PrintTasks lists running tasks in a cluster, optionally filtered by service.

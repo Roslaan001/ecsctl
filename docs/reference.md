@@ -40,6 +40,10 @@ ecsctl
 ├── scale            - Scale desired task count of a service
 ├── logs             - Aggregate and follow service task logs
 ├── exec             - Open interactive shell or run commands in container task
+├── express          - Create, update, inspect, and delete ECS Express Mode services
+├── register         - Register a task definition from ECS JSON
+├── run-task         - Run one-off Fargate tasks
+├── stop-task        - Stop a running task
 ├── state            - Manage remote state backend contexts
 │   ├── init
 │   ├── list-contexts
@@ -143,6 +147,18 @@ Open interactive shell or run commands in a container task.
   * `--container` (string): Target container name.
   * `--command` (string): Command to execute (defaults to shell).
 
+### `express`
+Manage ECS Express Mode web services; see [Express Mode guide](express.md).
+* `express create -f FILE [--wait]`: Create from Express service YAML.
+* `express update --service-arn ARN -f FILE [--wait]`: Update a service.
+* `express describe --service-arn ARN`: Show service status.
+* `express delete --service-arn ARN`: Begin managed service deletion.
+
+### Task definitions and one-off tasks
+* `register task-definition -f FILE`: Register an ECS task definition JSON document.
+* `run-task --cluster CLUSTER --task-definition FAMILY:REV`: Start standalone Fargate tasks; supports `--count`, `--subnets`, `--security-groups`, and `--assign-public-ip`.
+* `stop-task --cluster CLUSTER --task TASK_ID_OR_ARN`: Stop a running task.
+
 ### `state`
 Manage remote state backend contexts.
 * **Subcommands**:
@@ -163,4 +179,3 @@ Manage remote state backend contexts.
 
 ### `version`
 Print build version and compilation details.
-
