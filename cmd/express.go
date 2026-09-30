@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	ecsaws "github.com/roslaan001/ecsctl/pkg/aws"
 	"github.com/roslaan001/ecsctl/pkg/config"
+	"github.com/roslaan001/ecsctl/pkg/state"
 	"github.com/spf13/cobra"
 )
 
@@ -20,10 +21,17 @@ var expressCmd = &cobra.Command{Use: "express", Short: "Manage ECS Express Mode 
 var expressCreateCmd = &cobra.Command{
 	Use: "create", Short: "Create an ECS Express Mode service",
 	Example: "ecsctl express create -f express.yaml --wait",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		cfg, err := config.LoadExpressServiceConfig(expressFile)
 		if err != nil {
 			return err
+		}
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
 		}
 		client, err := ecsaws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
@@ -34,8 +42,10 @@ var expressCreateCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Created Express service %q (%s)\n", cfg.ServiceName, arn)
-		if err := writeExpressState(cfg, arn, region); err != nil {
-			fmt.Printf("Warning: Express service created but state not updated: %v\n", err)
+		if session != nil {
+			if err := recordExpressState(session, client, cfg, arn, region); err != nil {
+				return fmt.Errorf("Express service created but remote state was not updated: %w", err)
+			}
 		}
 		if expressWait {
 			fmt.Println("Waiting for service to become active...")
@@ -54,10 +64,17 @@ var expressCreateCmd = &cobra.Command{
 
 var expressUpdateCmd = &cobra.Command{
 	Use: "update", Short: "Update an ECS Express Mode service",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		cfg, err := config.LoadExpressServiceConfig(expressFile)
 		if err != nil {
 			return err
+		}
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
 		}
 		client, err := ecsaws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
@@ -67,8 +84,10 @@ var expressUpdateCmd = &cobra.Command{
 			return err
 		}
 		fmt.Printf("Updated Express service %s\n", expressARN)
-		if err := writeExpressState(cfg, expressARN, region); err != nil {
-			fmt.Printf("Warning: Express service updated but state not updated: %v\n", err)
+		if session != nil {
+			if err := recordExpressState(session, client, cfg, expressARN, region); err != nil {
+				return fmt.Errorf("Express service updated but remote state was not updated: %w", err)
+			}
 		}
 		if expressWait {
 			if err := client.WaitForExpressService(context.Background(), expressARN); err != nil {
@@ -167,7 +186,14 @@ func printExpressIngress(service *types.ECSExpressGatewayService) {
 	}
 }
 
-var expressDeleteCmd = &cobra.Command{Use: "delete", Short: "Delete an ECS Express Mode service", RunE: func(cmd *cobra.Command, args []string) error {
+var expressDeleteCmd = &cobra.Command{Use: "delete", Short: "Delete an ECS Express Mode service", RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+	session, err := beginStateSession(context.Background())
+	if err != nil {
+		return fmt.Errorf("locking remote state: %w", err)
+	}
+	if session != nil {
+		defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+	}
 	client, err := ecsaws.NewECSClient(context.Background(), region, profile)
 	if err != nil {
 		return err
@@ -176,8 +202,10 @@ var expressDeleteCmd = &cobra.Command{Use: "delete", Short: "Delete an ECS Expre
 		return err
 	}
 	fmt.Printf("Deletion started for Express service %s\n", expressARN)
-	if err := removeResourceStateByARN(expressARN); err != nil {
-		fmt.Printf("Warning: Express service deletion started but state not updated: %v\n", err)
+	if session != nil {
+		if err := session.Update(func(st *state.State) { st.RemoveResourceByARN(expressARN) }); err != nil {
+			return fmt.Errorf("Express service deletion started but remote state was not updated: %w", err)
+		}
 	}
 	return nil
 }}

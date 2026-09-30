@@ -62,6 +62,7 @@ type Client struct {
 	ecs         ecsIface
 	logs        *cloudwatchlogs.Client
 	autoscaling applicationAutoScalingIface
+	region      string
 }
 
 // LogsOptions holds options for fetching logs.
@@ -144,7 +145,39 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 		ecs:         ecs.NewFromConfig(cfg),
 		logs:        cloudwatchlogs.NewFromConfig(cfg),
 		autoscaling: applicationautoscaling.NewFromConfig(cfg),
+		region:      cfg.Region,
 	}, nil
+}
+
+// Region returns the resolved AWS region used by this client.
+func (c *Client) Region() string { return c.region }
+
+// ClusterARN returns the ARN for a named ECS cluster, regardless of status.
+func (c *Client) ClusterARN(ctx context.Context, clusterName string) (string, error) {
+	out, err := c.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{Clusters: []string{clusterName}})
+	if err != nil {
+		return "", fmt.Errorf("describing cluster identity: %w", err)
+	}
+	if len(out.Clusters) == 0 || aws.ToString(out.Clusters[0].ClusterArn) == "" {
+		return "", fmt.Errorf("cluster %q not found", clusterName)
+	}
+	return aws.ToString(out.Clusters[0].ClusterArn), nil
+}
+
+// ServiceARN returns the ARN for a named ECS service without querying optional
+// side resources such as Application Auto Scaling.
+func (c *Client) ServiceARN(ctx context.Context, clusterName, serviceName string) (string, error) {
+	out, err := c.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster:  aws.String(clusterName),
+		Services: []string{serviceName},
+	})
+	if err != nil {
+		return "", fmt.Errorf("describing service identity: %w", err)
+	}
+	if len(out.Services) == 0 || aws.ToString(out.Services[0].ServiceArn) == "" {
+		return "", fmt.Errorf("service %q not found in cluster %q", serviceName, clusterName)
+	}
+	return aws.ToString(out.Services[0].ServiceArn), nil
 }
 
 // CreateCluster creates an ECS cluster from config.
@@ -202,8 +235,8 @@ func (c *Client) ReconcileCluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 		return false, fmt.Errorf("cluster %q not found or not ACTIVE", cfg.Name)
 	}
 
-	capacityProvidersConfigured := len(cfg.CapacityProviders) > 0
-	strategyConfigured := len(cfg.DefaultCapacityProviderStrategy) > 0
+	capacityProvidersConfigured := cfg.CapacityProviders != nil
+	strategyConfigured := cfg.DefaultCapacityProviderStrategy != nil
 	wantProviders := current.CapacityProviders
 	if capacityProvidersConfigured {
 		wantProviders = cfg.CapacityProviders
@@ -229,7 +262,17 @@ func (c *Client) ReconcileCluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 	changed := capacityProviderDrift || serviceConnectDrift || tagsDrift
 	if !changed || dryRun {
 		if dryRun && changed {
-			fmt.Printf("[dry-run] Would reconcile configured fields for cluster %q.\n", cfg.Name)
+			fields := make([]string, 0, 3)
+			if capacityProviderDrift {
+				fields = append(fields, "capacityProviders/defaultCapacityProviderStrategy")
+			}
+			if serviceConnectDrift {
+				fields = append(fields, "serviceConnectDefaultsNamespace")
+			}
+			if tagsDrift {
+				fields = append(fields, "tags")
+			}
+			fmt.Printf("[dry-run] Cluster %q would update: %s.\n", cfg.Name, strings.Join(fields, ", "))
 		}
 		return changed, nil
 	}
@@ -392,29 +435,35 @@ func (c *Client) CreateService(ctx context.Context, cfg *ecscfg.ServiceConfig) e
 	if schedulingStrategy == "" {
 		schedulingStrategy = "REPLICA"
 	}
-	input := &ecs.CreateServiceInput{
-		Cluster:                  aws.String(cfg.Cluster),
-		ServiceName:              aws.String(cfg.Name),
-		TaskDefinition:           aws.String(cfg.TaskDefinition),
-		LaunchType:               types.LaunchType(cfg.LaunchType),
-		SchedulingStrategy:       types.SchedulingStrategy(schedulingStrategy),
-		CapacityProviderStrategy: toCapacityProviderStrategy(cfg.CapacityProviderStrategy),
-		DeploymentController:     toDeploymentController(cfg.DeploymentController),
-		DeploymentConfiguration:  toDeploymentConfiguration(cfg.DeploymentConfiguration),
-		LoadBalancers:            toLoadBalancers(cfg.LoadBalancers),
-		ServiceRegistries:        toServiceRegistries(cfg.ServiceRegistries),
-		PlacementConstraints:     toPlacementConstraints(cfg.PlacementConstraints),
-		PlacementStrategy:        toPlacementStrategies(cfg.PlacementStrategy),
-		Tags:                     toECSTags(cfg.Tags),
-		PropagateTags:            types.PropagateTags(cfg.PropagateTags),
+	launchType := cfg.LaunchType
+	if launchType == "" && len(cfg.CapacityProviderStrategy) == 0 {
+		launchType = "FARGATE"
 	}
-	if cfg.DesiredCount > 0 {
+	input := &ecs.CreateServiceInput{
+		Cluster:                 aws.String(cfg.Cluster),
+		ServiceName:             aws.String(cfg.Name),
+		TaskDefinition:          aws.String(cfg.TaskDefinition),
+		LaunchType:              types.LaunchType(launchType),
+		SchedulingStrategy:      types.SchedulingStrategy(schedulingStrategy),
+		DeploymentController:    toDeploymentController(cfg.DeploymentController),
+		DeploymentConfiguration: toDeploymentConfiguration(cfg.DeploymentConfiguration),
+		LoadBalancers:           toLoadBalancers(cfg.LoadBalancers),
+		ServiceRegistries:       toServiceRegistries(cfg.ServiceRegistries),
+		PlacementConstraints:    toPlacementConstraints(cfg.PlacementConstraints),
+		PlacementStrategy:       toPlacementStrategies(cfg.PlacementStrategy),
+		Tags:                    toECSTags(cfg.Tags),
+		PropagateTags:           types.PropagateTags(cfg.PropagateTags),
+	}
+	if cfg.DesiredCountConfigured || cfg.DesiredCount > 0 {
 		input.DesiredCount = aws.Int32(cfg.DesiredCount)
+	} else if schedulingStrategy == "REPLICA" {
+		input.DesiredCount = aws.Int32(1)
 	}
 	if cfg.EnableECSManagedTags != nil {
 		input.EnableECSManagedTags = *cfg.EnableECSManagedTags
 	}
 	if len(cfg.CapacityProviderStrategy) > 0 {
+		input.CapacityProviderStrategy = toCapacityProviderStrategy(cfg.CapacityProviderStrategy)
 		input.LaunchType = ""
 	}
 	if cfg.EnableExecuteCommand != nil {
@@ -1171,12 +1220,16 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 		Services: []string{cfg.Name},
 		Include:  []types.ServiceField{types.ServiceFieldTags},
 	})
-	if err != nil || len(out.Services) == 0 {
+	if err != nil {
 		return false, fmt.Errorf("describing service: %w", err)
+	}
+	if len(out.Services) == 0 {
+		return false, fmt.Errorf("service %q not found in cluster %q", cfg.Name, cfg.Cluster)
 	}
 
 	svc := out.Services[0]
 	changed := false
+	changes := make([]string, 0)
 	updateInput := &ecs.UpdateServiceInput{
 		Cluster: aws.String(cfg.Cluster),
 		Service: aws.String(cfg.Name),
@@ -1196,54 +1249,68 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 	if desiredLaunchType == "" {
 		desiredLaunchType = "FARGATE"
 	}
-	if len(cfg.CapacityProviderStrategy) == 0 && string(svc.LaunchType) != desiredLaunchType {
+	if cfg.CapacityProviderStrategy == nil && (cfg.LaunchTypeConfigured || cfg.LaunchType != "") && string(svc.LaunchType) != desiredLaunchType {
 		return false, fmt.Errorf("service launchType cannot be changed from %q to %q in place; replace the service or configure capacityProviderStrategy", svc.LaunchType, desiredLaunchType)
 	}
 
-	if desiredScheduling == "REPLICA" && cfg.AutoScaling == nil && svc.DesiredCount != cfg.DesiredCount {
+	if desiredScheduling == "REPLICA" && cfg.AutoScaling == nil && (cfg.DesiredCountConfigured || cfg.DesiredCount != 0) && svc.DesiredCount != cfg.DesiredCount {
 		fmt.Printf("  desiredCount: %d → %d\n", svc.DesiredCount, cfg.DesiredCount)
 		updateInput.DesiredCount = aws.Int32(cfg.DesiredCount)
 		changed = true
+		changes = append(changes, "desiredCount")
 	}
 	if taskDefinitionRef(aws.ToString(svc.TaskDefinition)) != taskDefinitionRef(cfg.TaskDefinition) {
 		fmt.Printf("  taskDefinition: %s → %s\n", aws.ToString(svc.TaskDefinition), cfg.TaskDefinition)
 		updateInput.TaskDefinition = aws.String(cfg.TaskDefinition)
 		changed = true
+		changes = append(changes, "taskDefinition")
 	}
 	if cfg.DeploymentController != nil && !reflect.DeepEqual(svc.DeploymentController, toDeploymentController(cfg.DeploymentController)) {
 		updateInput.DeploymentController = toDeploymentController(cfg.DeploymentController)
 		changed = true
+		changes = append(changes, "deploymentController")
 	}
 	if cfg.DeploymentConfiguration != nil && !reflect.DeepEqual(svc.DeploymentConfiguration, toDeploymentConfiguration(cfg.DeploymentConfiguration)) {
 		updateInput.DeploymentConfiguration = toDeploymentConfiguration(cfg.DeploymentConfiguration)
 		changed = true
+		changes = append(changes, "deploymentConfiguration")
 	}
-	if len(cfg.CapacityProviderStrategy) > 0 && !reflect.DeepEqual(svc.CapacityProviderStrategy, toCapacityProviderStrategy(cfg.CapacityProviderStrategy)) {
+	if cfg.CapacityProviderStrategy != nil && !sameSlice(svc.CapacityProviderStrategy, toCapacityProviderStrategy(cfg.CapacityProviderStrategy)) {
 		updateInput.CapacityProviderStrategy = toCapacityProviderStrategy(cfg.CapacityProviderStrategy)
 		changed = true
+		changes = append(changes, "capacityProviderStrategy")
 	}
 	if cfg.NetworkConfig != nil {
 		want := &types.NetworkConfiguration{AwsvpcConfiguration: &types.AwsVpcConfiguration{Subnets: cfg.NetworkConfig.Subnets, SecurityGroups: cfg.NetworkConfig.SecurityGroups, AssignPublicIp: types.AssignPublicIp(cfg.NetworkConfig.AssignPublicIP)}}
 		if !reflect.DeepEqual(svc.NetworkConfiguration, want) {
 			updateInput.NetworkConfiguration = want
 			changed = true
+			changes = append(changes, "network")
 		}
 	}
-	if len(cfg.LoadBalancers) > 0 && !reflect.DeepEqual(svc.LoadBalancers, toLoadBalancers(cfg.LoadBalancers)) {
+	if cfg.LoadBalancers != nil && !sameSlice(svc.LoadBalancers, toLoadBalancers(cfg.LoadBalancers)) {
+		fmt.Printf("  loadBalancers: updating %d item(s)\n", len(cfg.LoadBalancers))
 		updateInput.LoadBalancers = toLoadBalancers(cfg.LoadBalancers)
 		changed = true
+		changes = append(changes, "loadBalancers")
 	}
-	if len(cfg.ServiceRegistries) > 0 && !reflect.DeepEqual(svc.ServiceRegistries, toServiceRegistries(cfg.ServiceRegistries)) {
+	if cfg.ServiceRegistries != nil && !sameSlice(svc.ServiceRegistries, toServiceRegistries(cfg.ServiceRegistries)) {
+		fmt.Printf("  serviceRegistries: updating %d item(s)\n", len(cfg.ServiceRegistries))
 		updateInput.ServiceRegistries = toServiceRegistries(cfg.ServiceRegistries)
 		changed = true
+		changes = append(changes, "serviceRegistries")
 	}
-	if len(cfg.PlacementConstraints) > 0 && !reflect.DeepEqual(svc.PlacementConstraints, toPlacementConstraints(cfg.PlacementConstraints)) {
+	if cfg.PlacementConstraints != nil && !sameSlice(svc.PlacementConstraints, toPlacementConstraints(cfg.PlacementConstraints)) {
+		fmt.Printf("  placementConstraints: updating %d item(s)\n", len(cfg.PlacementConstraints))
 		updateInput.PlacementConstraints = toPlacementConstraints(cfg.PlacementConstraints)
 		changed = true
+		changes = append(changes, "placementConstraints")
 	}
-	if len(cfg.PlacementStrategy) > 0 && !reflect.DeepEqual(svc.PlacementStrategy, toPlacementStrategies(cfg.PlacementStrategy)) {
+	if cfg.PlacementStrategy != nil && !sameSlice(svc.PlacementStrategy, toPlacementStrategies(cfg.PlacementStrategy)) {
+		fmt.Printf("  placementStrategy: updating %d item(s)\n", len(cfg.PlacementStrategy))
 		updateInput.PlacementStrategy = toPlacementStrategies(cfg.PlacementStrategy)
 		changed = true
+		changes = append(changes, "placementStrategy")
 	}
 	if cfg.ServiceConnect != nil {
 		want := toServiceConnect(cfg.ServiceConnect)
@@ -1257,30 +1324,37 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 		if !reflect.DeepEqual(current, want) {
 			updateInput.ServiceConnectConfiguration = want
 			changed = true
+			changes = append(changes, "serviceConnect")
 		}
 	}
 	if cfg.EnableExecuteCommand != nil && svc.EnableExecuteCommand != *cfg.EnableExecuteCommand {
 		updateInput.EnableExecuteCommand = cfg.EnableExecuteCommand
 		changed = true
+		changes = append(changes, "enableExecuteCommand")
 	}
-	if cfg.HealthCheckGracePeriodSeconds > 0 && aws.ToInt32(svc.HealthCheckGracePeriodSeconds) != cfg.HealthCheckGracePeriodSeconds {
+	if (cfg.HealthCheckGraceConfigured || cfg.HealthCheckGracePeriodSeconds != 0) && aws.ToInt32(svc.HealthCheckGracePeriodSeconds) != cfg.HealthCheckGracePeriodSeconds {
 		updateInput.HealthCheckGracePeriodSeconds = aws.Int32(cfg.HealthCheckGracePeriodSeconds)
 		changed = true
+		changes = append(changes, "healthCheckGracePeriodSeconds")
 	}
 	if cfg.PlatformVersion != "" && aws.ToString(svc.PlatformVersion) != cfg.PlatformVersion {
 		updateInput.PlatformVersion = aws.String(cfg.PlatformVersion)
 		changed = true
+		changes = append(changes, "platformVersion")
 	}
 	if cfg.PropagateTags != "" && string(svc.PropagateTags) != cfg.PropagateTags {
 		updateInput.PropagateTags = types.PropagateTags(cfg.PropagateTags)
 		changed = true
+		changes = append(changes, "propagateTags")
 	}
 	if cfg.EnableECSManagedTags != nil && *cfg.EnableECSManagedTags != svc.EnableECSManagedTags {
 		updateInput.EnableECSManagedTags = cfg.EnableECSManagedTags
 		changed = true
+		changes = append(changes, "enableECSManagedTags")
 	}
 	if cfg.Tags != nil && !tagsEqual(svc.Tags, cfg.Tags) {
 		changed = true
+		changes = append(changes, "tags")
 	}
 	autoScalingDrift := false
 	if cfg.AutoScaling != nil {
@@ -1290,11 +1364,14 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 			return false, err
 		}
 		changed = changed || autoScalingDrift
+		if autoScalingDrift {
+			changes = append(changes, "autoScaling")
+		}
 	}
 
 	if changed {
 		if dryRun {
-			fmt.Printf("[dry-run] Would reconcile configured fields for service %q.\n", cfg.Name)
+			fmt.Printf("[dry-run] Service %q would update: %s.\n", cfg.Name, strings.Join(changes, ", "))
 		} else {
 			if updateInput.DesiredCount != nil || updateInput.TaskDefinition != nil || updateInput.DeploymentController != nil || updateInput.DeploymentConfiguration != nil || updateInput.CapacityProviderStrategy != nil || updateInput.NetworkConfiguration != nil || updateInput.LoadBalancers != nil || updateInput.ServiceRegistries != nil || updateInput.PlacementConstraints != nil || updateInput.PlacementStrategy != nil || updateInput.ServiceConnectConfiguration != nil || updateInput.EnableExecuteCommand != nil || updateInput.HealthCheckGracePeriodSeconds != nil || updateInput.PlatformVersion != nil || updateInput.PropagateTags != "" || updateInput.EnableECSManagedTags != nil {
 				if _, err := c.ecs.UpdateService(ctx, updateInput); err != nil {
@@ -1323,6 +1400,13 @@ func taskDefinitionRef(value string) string {
 		return value[slash+1:]
 	}
 	return value
+}
+
+func sameSlice[T any](current, desired []T) bool {
+	if len(current) == 0 && len(desired) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(current, desired)
 }
 
 func tagsEqual(current []types.Tag, desired map[string]string) bool {
@@ -1516,6 +1600,7 @@ func serviceConfigFromAWS(service types.Service) *ecscfg.ServiceConfig {
 		Name: aws.ToString(service.ServiceName), Cluster: clusterNameFromARN(aws.ToString(service.ClusterArn)),
 		TaskDefinition: aws.ToString(service.TaskDefinition), LaunchType: string(service.LaunchType), SchedulingStrategy: scheduling,
 		DesiredCount: service.DesiredCount, HealthCheckGracePeriodSeconds: aws.ToInt32(service.HealthCheckGracePeriodSeconds),
+		DesiredCountConfigured: true, HealthCheckGraceConfigured: true, LaunchTypeConfigured: aws.ToString(service.LaunchType) != "",
 		EnableExecuteCommand: aws.Bool(service.EnableExecuteCommand), EnableECSManagedTags: aws.Bool(service.EnableECSManagedTags),
 		PropagateTags: string(service.PropagateTags), PlatformVersion: aws.ToString(service.PlatformVersion),
 	}

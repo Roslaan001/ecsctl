@@ -6,7 +6,12 @@
 
 ## 🔍 Listing Resources (`list`)
 
-The `list` command displays lists of clusters, services, and tasks. If a remote state context is active, `list clusters` and `list services` will fetch details from the state backend. Otherwise, they will query your live AWS account.
+The `list` command displays lists of clusters, services, and tasks. If a remote state context is active, `list clusters` and `list services` show the saved inventory by default. Add `--live` to query AWS directly and see current resources, including resources changed or deleted outside ecsctl. Without a configured state context, the commands query AWS directly.
+
+```bash
+ecsctl list clusters --live --region eu-west-2
+ecsctl list services --cluster production --live --region eu-west-2
+```
 
 ### 1. List Clusters
 List all ECS clusters:

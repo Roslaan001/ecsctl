@@ -7,17 +7,20 @@
 //	├── staging/state.json
 //	└── staging/state.lock
 //
-// Locking uses a HeadObject check followed by PutObject.
+// Locking uses S3 conditional PutObject writes.
 package state
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -58,11 +61,15 @@ type State struct {
 
 // Backend reads and writes state to a specific key prefix inside an S3 bucket.
 type Backend struct {
-	s3       *s3.Client
-	bucket   string
-	stateKey string // e.g. "prod/state.json"
-	lockKey  string // e.g. "prod/state.lock"
-	kmsKeyID string // optional KMS key ID for state encryption
+	s3          *s3.Client
+	bucket      string
+	stateKey    string // e.g. "prod/state.json"
+	lockKey     string // e.g. "prod/state.lock"
+	kmsKeyID    string // optional KMS key ID for state encryption
+	lockID      string
+	lockETag    string
+	stateETag   string
+	stateExists bool
 }
 
 // NewBackend creates a Backend for the given bucket and key prefix.
@@ -104,6 +111,8 @@ func (b *Backend) Load(ctx context.Context) (*State, error) {
 	if err != nil {
 		var nsk *s3types.NoSuchKey
 		if errors.As(err, &nsk) {
+			b.stateETag = ""
+			b.stateExists = false
 			return &State{Version: "1", Resources: []Resource{}}, nil
 		}
 		return nil, fmt.Errorf("reading state from s3://%s/%s: %w", b.bucket, b.stateKey, err)
@@ -119,6 +128,8 @@ func (b *Backend) Load(ctx context.Context) (*State, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("parsing state JSON: %w", err)
 	}
+	b.stateETag = aws.ToString(out.ETag)
+	b.stateExists = true
 	return &st, nil
 }
 
@@ -136,22 +147,37 @@ func (b *Backend) Save(ctx context.Context, st *State) error {
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String("application/json"),
 	}
+	if b.stateExists {
+		if b.stateETag == "" {
+			return fmt.Errorf("cannot safely update state without its S3 ETag; reload state first")
+		}
+		input.IfMatch = aws.String(b.stateETag)
+	} else {
+		input.IfNoneMatch = aws.String("*")
+	}
 	if b.kmsKeyID != "" {
 		input.ServerSideEncryption = s3types.ServerSideEncryptionAwsKms
 		input.SSEKMSKeyId = aws.String(b.kmsKeyID)
 	}
 
-	_, err = b.s3.PutObject(ctx, input)
+	out, err := b.s3.PutObject(ctx, input)
 	if err != nil {
 		return fmt.Errorf("writing state to s3://%s/%s: %w", b.bucket, b.stateKey, err)
 	}
+	b.stateETag = aws.ToString(out.ETag)
+	b.stateExists = true
 	return nil
 }
 
 // Lock acquires a distributed lock by writing a lock file conditional on its absence.
 func (b *Backend) Lock(ctx context.Context) error {
 	caller := currentUser()
-	body := []byte(fmt.Sprintf(`{"lockedBy":%q,"lockedAt":%q}`, caller, time.Now().UTC().Format(time.RFC3339)))
+	var tokenBytes [16]byte
+	if _, err := rand.Read(tokenBytes[:]); err != nil {
+		return fmt.Errorf("creating lock token: %w", err)
+	}
+	lockID := hex.EncodeToString(tokenBytes[:])
+	body := []byte(fmt.Sprintf(`{"lockId":%q,"lockedBy":%q,"lockedAt":%q}`, lockID, caller, time.Now().UTC().Format(time.RFC3339)))
 
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(b.bucket),
@@ -165,7 +191,7 @@ func (b *Backend) Lock(ctx context.Context) error {
 		input.SSEKMSKeyId = aws.String(b.kmsKeyID)
 	}
 
-	_, err := b.s3.PutObject(ctx, input)
+	out, err := b.s3.PutObject(ctx, input)
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "PreconditionFailed" {
@@ -174,11 +200,36 @@ func (b *Backend) Lock(ctx context.Context) error {
 		}
 		return fmt.Errorf("acquiring lock: %w", err)
 	}
+	b.lockID = lockID
+	b.lockETag = aws.ToString(out.ETag)
 	return nil
 }
 
 // Unlock releases the lock by deleting the lock object.
 func (b *Backend) Unlock(ctx context.Context) error {
+	if b.lockID == "" || b.lockETag == "" {
+		return fmt.Errorf("this backend does not hold the lock")
+	}
+	_, err := b.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket:  aws.String(b.bucket),
+		Key:     aws.String(b.lockKey),
+		IfMatch: aws.String(b.lockETag),
+	})
+	if err == nil {
+		b.lockID = ""
+		b.lockETag = ""
+	}
+	return err
+}
+
+// LockInfo returns a human-readable description of the current lock.
+func (b *Backend) LockInfo(ctx context.Context) (string, error) {
+	return b.lockInfo(ctx)
+}
+
+// ForceUnlock removes a lock without checking its owner. Use only after
+// confirming that no ecsctl operation is still using this state context.
+func (b *Backend) ForceUnlock(ctx context.Context) error {
 	_, err := b.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(b.lockKey),
@@ -193,7 +244,11 @@ func (b *Backend) lockInfo(ctx context.Context) (string, error) {
 		Key:    aws.String(b.lockKey),
 	})
 	if err != nil {
-		return "unknown", nil
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && (apiErr.ErrorCode() == "NoSuchKey" || apiErr.ErrorCode() == "NotFound") {
+			return "not locked", nil
+		}
+		return "unknown", err
 	}
 	defer func() { _ = out.Body.Close() }()
 	data, _ := io.ReadAll(out.Body)
@@ -220,10 +275,18 @@ func currentUser() string {
 
 // --- State helper methods ---
 
-// AddResource adds or replaces a resource (upsert by type+name+cluster).
+// AddResource adds or replaces a resource by type, name, cluster, region, and ARN.
 func (st *State) AddResource(r Resource) {
 	for i, existing := range st.Resources {
-		if existing.Type == r.Type && existing.Name == r.Name && existing.Cluster == r.Cluster {
+		sameResource := existing.ARN != "" && r.ARN != "" && existing.ARN == r.ARN
+		legacyMatch := existing.Region == r.Region && (existing.ARN == "" || r.ARN == "")
+		if existing.Type == r.Type && existing.Name == r.Name && existing.Cluster == r.Cluster && (sameResource || legacyMatch) {
+			if r.CreatedAt.IsZero() {
+				r.CreatedAt = existing.CreatedAt
+			}
+			if r.CreatedBy == "" {
+				r.CreatedBy = existing.CreatedBy
+			}
 			st.Resources[i] = r
 			return
 		}
@@ -236,6 +299,18 @@ func (st *State) RemoveResource(resourceType ResourceType, name, cluster string)
 	filtered := st.Resources[:0]
 	for _, r := range st.Resources {
 		if r.Type == resourceType && r.Name == name && r.Cluster == cluster {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	st.Resources = filtered
+}
+
+// RemoveResourceInRegion removes a resource by type, name, cluster, and region.
+func (st *State) RemoveResourceInRegion(resourceType ResourceType, name, cluster, region string) {
+	filtered := st.Resources[:0]
+	for _, r := range st.Resources {
+		if r.Type == resourceType && r.Name == name && r.Cluster == cluster && r.Region == region {
 			continue
 		}
 		filtered = append(filtered, r)
@@ -268,6 +343,43 @@ func (st *State) RemoveClusterAndServices(clusterName string) {
 		filtered = append(filtered, r)
 	}
 	st.Resources = filtered
+}
+
+// RemoveClusterAndServicesInRegion removes a cluster and its services only in
+// the requested region, preserving same-named resources in other regions.
+func (st *State) RemoveClusterAndServicesInRegion(clusterName, region string) {
+	filtered := st.Resources[:0]
+	for _, r := range st.Resources {
+		if r.Region == region && ((r.Type == ResourceTypeCluster && r.Name == clusterName) || r.Cluster == clusterName) {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	st.Resources = filtered
+}
+
+// RemoveClusterAndServicesByARN removes a cluster and its services in the
+// account and region identified by the cluster ARN.
+func (st *State) RemoveClusterAndServicesByARN(clusterName, clusterARN, region string) {
+	targetScope := arnScope(clusterARN)
+	filtered := st.Resources[:0]
+	for _, r := range st.Resources {
+		belongsToCluster := (r.Type == ResourceTypeCluster && r.Name == clusterName) || r.Cluster == clusterName
+		legacyInRegion := r.ARN == "" && region != "" && r.Region == region
+		if belongsToCluster && (r.ARN == clusterARN || (targetScope != "" && arnScope(r.ARN) == targetScope) || legacyInRegion) {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	st.Resources = filtered
+}
+
+func arnScope(arn string) string {
+	parts := strings.SplitN(arn, ":", 6)
+	if len(parts) < 6 || parts[0] != "arn" {
+		return ""
+	}
+	return strings.Join(parts[:5], ":")
 }
 
 // FindExpressServices returns tracked Express services, optionally filtered by cluster.

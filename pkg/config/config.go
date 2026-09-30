@@ -163,8 +163,10 @@ type ServiceConfig struct {
 	Cluster                       string                           `yaml:"cluster"`
 	TaskDefinition                string                           `yaml:"taskDefinition"`
 	LaunchType                    string                           `yaml:"launchType"`
+	LaunchTypeConfigured          bool                             `yaml:"-"`
 	SchedulingStrategy            string                           `yaml:"schedulingStrategy"`
 	DesiredCount                  int32                            `yaml:"desiredCount"`
+	DesiredCountConfigured        bool                             `yaml:"-"`
 	NetworkConfig                 *NetworkConfig                   `yaml:"network"`
 	Tags                          map[string]string                `yaml:"tags"`
 	CapacityProviderStrategy      []CapacityProviderStrategyConfig `yaml:"capacityProviderStrategy"`
@@ -173,6 +175,7 @@ type ServiceConfig struct {
 	LoadBalancers                 []LoadBalancerConfig             `yaml:"loadBalancers"`
 	ServiceRegistries             []ServiceRegistryConfig          `yaml:"serviceRegistries"`
 	HealthCheckGracePeriodSeconds int32                            `yaml:"healthCheckGracePeriodSeconds"`
+	HealthCheckGraceConfigured    bool                             `yaml:"-"`
 	EnableExecuteCommand          *bool                            `yaml:"enableExecuteCommand"`
 	EnableECSManagedTags          *bool                            `yaml:"enableECSManagedTags"`
 	PropagateTags                 string                           `yaml:"propagateTags"`
@@ -181,6 +184,36 @@ type ServiceConfig struct {
 	PlacementStrategy             []PlacementStrategyConfig        `yaml:"placementStrategy"`
 	ServiceConnect                *ServiceConnectConfig            `yaml:"serviceConnect"`
 	AutoScaling                   *ServiceAutoScalingConfig        `yaml:"autoScaling"`
+}
+
+// MarshalYAML preserves the distinction between omitted settings and explicit
+// zero values such as desiredCount: 0 or a zero health-check grace period.
+func (cfg ServiceConfig) MarshalYAML() (any, error) {
+	type serviceConfigAlias ServiceConfig
+	data, err := yaml.Marshal(serviceConfigAlias(cfg))
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]any
+	if err := yaml.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	if cfg.DesiredCountConfigured || cfg.DesiredCount != 0 {
+		fields["desiredCount"] = cfg.DesiredCount
+	} else {
+		delete(fields, "desiredCount")
+	}
+	if cfg.LaunchTypeConfigured || cfg.LaunchType != "" {
+		fields["launchType"] = cfg.LaunchType
+	} else {
+		delete(fields, "launchType")
+	}
+	if cfg.HealthCheckGraceConfigured || cfg.HealthCheckGracePeriodSeconds != 0 {
+		fields["healthCheckGracePeriodSeconds"] = cfg.HealthCheckGracePeriodSeconds
+	} else {
+		delete(fields, "healthCheckGracePeriodSeconds")
+	}
+	return fields, nil
 }
 
 // DetectResourceType reads a YAML file and returns "cluster" or "service"
@@ -234,49 +267,59 @@ func LoadServiceConfig(path string) (*ServiceConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading config file %q: %w", path, err)
 	}
+	cfg, err := DecodeServiceConfig(data)
+	if err != nil {
+		return nil, fmt.Errorf("config file %q: %w", path, err)
+	}
+	return cfg, nil
+}
 
+// DecodeServiceConfig parses a service configuration and preserves which
+// zero-valued fields were explicitly present in the YAML.
+func DecodeServiceConfig(data []byte) (*ServiceConfig, error) {
 	var cfg ServiceConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
+		return nil, fmt.Errorf("parsing service config: %w", err)
 	}
+	var fields map[string]yaml.Node
+	if err := yaml.Unmarshal(data, &fields); err != nil {
+		return nil, fmt.Errorf("parsing service config: %w", err)
+	}
+	_, cfg.DesiredCountConfigured = fields["desiredCount"]
+	_, cfg.HealthCheckGraceConfigured = fields["healthCheckGracePeriodSeconds"]
+	_, cfg.LaunchTypeConfigured = fields["launchType"]
 
 	if cfg.Name == "" {
-		return nil, fmt.Errorf("config file %q: 'name' is required", path)
+		return nil, fmt.Errorf("service config: 'name' is required")
 	}
 	if cfg.Cluster == "" {
-		return nil, fmt.Errorf("config file %q: 'cluster' is required", path)
+		return nil, fmt.Errorf("service config: 'cluster' is required")
 	}
 	if cfg.TaskDefinition == "" {
-		return nil, fmt.Errorf("config file %q: 'taskDefinition' is required", path)
-	}
-	if cfg.LaunchType == "" {
-		cfg.LaunchType = "FARGATE"
+		return nil, fmt.Errorf("service config: 'taskDefinition' is required")
 	}
 	if cfg.SchedulingStrategy == "" {
 		cfg.SchedulingStrategy = "REPLICA"
 	}
 	if cfg.SchedulingStrategy != "REPLICA" && cfg.SchedulingStrategy != "DAEMON" {
-		return nil, fmt.Errorf("config file %q: schedulingStrategy must be REPLICA or DAEMON", path)
+		return nil, fmt.Errorf("service config: schedulingStrategy must be REPLICA or DAEMON")
 	}
 	if cfg.SchedulingStrategy == "DAEMON" && cfg.DesiredCount > 0 {
-		return nil, fmt.Errorf("config file %q: desiredCount cannot be set for DAEMON services", path)
+		return nil, fmt.Errorf("service config: desiredCount cannot be set for DAEMON services")
 	}
 	if cfg.SchedulingStrategy == "DAEMON" && cfg.AutoScaling != nil {
-		return nil, fmt.Errorf("config file %q: autoScaling cannot be configured for DAEMON services", path)
-	}
-	if cfg.SchedulingStrategy == "REPLICA" && cfg.DesiredCount == 0 {
-		cfg.DesiredCount = 1
+		return nil, fmt.Errorf("service config: autoScaling cannot be configured for DAEMON services")
 	}
 	if cfg.AutoScaling != nil {
 		if cfg.AutoScaling.MinCapacity < 0 || cfg.AutoScaling.MaxCapacity <= 0 || cfg.AutoScaling.MinCapacity > cfg.AutoScaling.MaxCapacity {
-			return nil, fmt.Errorf("config file %q: autoScaling requires 0 <= minCapacity <= maxCapacity and maxCapacity > 0", path)
+			return nil, fmt.Errorf("service config: autoScaling requires 0 <= minCapacity <= maxCapacity and maxCapacity > 0")
 		}
 		if cfg.AutoScaling.TargetValue < 0 {
-			return nil, fmt.Errorf("config file %q: autoScaling.targetValue must be positive", path)
+			return nil, fmt.Errorf("service config: autoScaling.targetValue must be positive")
 		}
 		metric := cfg.AutoScaling.Metric
 		if metric != "" && metric != "CPU" && metric != "Memory" && metric != "cpu" && metric != "memory" {
-			return nil, fmt.Errorf("config file %q: autoScaling.metric must be CPU or Memory", path)
+			return nil, fmt.Errorf("service config: autoScaling.metric must be CPU or Memory")
 		}
 	}
 
