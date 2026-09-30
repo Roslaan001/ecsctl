@@ -1,0 +1,71 @@
+name: ECS Express AWS smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region with ECS Express Mode enabled
+        required: true
+        type: string
+      cluster:
+        description: Existing ECS cluster for the temporary smoke service
+        required: true
+        type: string
+      infrastructure_role_arn:
+        description: ECS infrastructure role ARN
+        required: true
+        type: string
+      execution_role_arn:
+        description: ECS task execution role ARN
+        required: true
+        type: string
+      image:
+        description: Container image accessible to ECS
+        required: true
+        type: string
+      subnets:
+        description: Optional comma-separated subnet IDs
+        required: false
+        type: string
+      security_groups:
+        description: Optional comma-separated security group IDs
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  express-smoke:
+    name: ECS Express AWS lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_SMOKE_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+          role-session-name: ecsctl-express-smoke-${{ github.run_id }}
+
+      - name: Create, describe, and delete a temporary Express service
+        env:
+          AWS_REGION: ${{ inputs.aws_region }}
+          ECSCTL_AWS_EXPRESS_SMOKE: "1"
+          ECSCTL_AWS_EXPRESS_CLUSTER: ${{ inputs.cluster }}
+          ECSCTL_AWS_EXPRESS_INFRASTRUCTURE_ROLE_ARN: ${{ inputs.infrastructure_role_arn }}
+          ECSCTL_AWS_EXPRESS_EXECUTION_ROLE_ARN: ${{ inputs.execution_role_arn }}
+          ECSCTL_AWS_EXPRESS_IMAGE: ${{ inputs.image }}
+          ECSCTL_AWS_EXPRESS_SUBNETS: ${{ inputs.subnets }}
+          ECSCTL_AWS_EXPRESS_SECURITY_GROUPS: ${{ inputs.security_groups }}
+        run: go test -tags=integration ./pkg/aws -run '^TestAWSExpressServiceLifecycle$' -count=1 -v
