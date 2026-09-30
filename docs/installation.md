@@ -1,10 +1,10 @@
 # Installation
 
-There are several ways to install `ecsctl` depending on your environment and preferences.
+Choose the installation method that matches your machine. The installer downloads a prebuilt binary; `go install` and building from source require Go.
 
 ---
 
-## 1. Quick Install Script (Recommended)
+## Install with the setup script
 
 === "macOS / Linux"
 
@@ -14,15 +14,15 @@ There are several ways to install `ecsctl` depending on your environment and pre
     curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
     ```
 
-    #### Install a Specific Version
-    If you wish to install a specific tag/version, pass it as an argument:
+    #### Install a specific version
+    To install a tagged release instead of the latest release, pass its tag:
 
     ```bash
     curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh -s -- v0.1.0
     ```
 
-    #### Non-Root Installation
-    If your user doesn't have root permissions and `sudo` is not available, the script will automatically fallback to installing inside `$HOME/.local/bin`. Make sure to add this path to your shell profile (e.g., `~/.bashrc` or `~/.zshrc`):
+    #### Install without administrator access
+    If the script cannot write to `/usr/local/bin`, it installs the binary in `$HOME/.local/bin`. Add that directory to your `PATH` if it is not already there. For the current shell, run:
 
     ```bash
     export PATH="$HOME/.local/bin:$PATH"
@@ -36,12 +36,18 @@ There are several ways to install `ecsctl` depending on your environment and pre
     irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
     ```
 
-    This script automatically:
+    The script automatically:
     * Resolves the latest version of `ecsctl`.
     * Detects your system architecture (AMD64 or ARM64).
     * Downloads and extracts the official `.zip` archive.
     * Copies `ecsctl.exe` to `$HOME/.ecsctl/bin`.
     * Appends the directory to your user `PATH` environment variable.
+
+After installing, open a new terminal if your `PATH` changed and confirm the command is available:
+
+```bash
+ecsctl version
+```
 
 
 ---
@@ -70,26 +76,25 @@ cd ecsctl
 # Build the binary to ./bin/ecsctl
 make build
 
-# Install the binary globally to $GOPATH/bin
+# Install the binary to your Go bin directory
 make install
 ```
 
 ---
 
-## Prerequisites
+## Configure AWS access
 
-Before running `ecsctl`, make sure you have set up the following prerequisites:
+Installing ecsctl does not require AWS credentials. To run commands that create, inspect, or change ECS resources, configure AWS access for the account and Region you intend to use. Your credentials must have permission for the action; ecsctl cannot grant AWS permissions.
 
-### AWS Credentials
-`ecsctl` uses the default AWS SDK credential provider chain. You can configure credentials using:
-1. **Environment Variables**:
-   ```bash
-   export AWS_ACCESS_KEY_ID="AKIA..."
-   export AWS_SECRET_ACCESS_KEY="wJalr..."
-   export AWS_DEFAULT_REGION="us-east-1"
-   ```
-2. **Shared Credentials File** (`~/.aws/credentials` and `~/.aws/config`):
-   Set up your profiles using the `aws configure` command. You can pass the `--profile` flag to `ecsctl` commands to use a specific profile.
+ecsctl uses the standard AWS SDK credential chain. It can use credentials from an AWS profile, environment variables, or an attached IAM role. Follow your organization's approved sign-in method. For a named local profile, select it for the current shell:
+
+```bash
+export AWS_PROFILE=development
+export AWS_REGION=eu-west-2
+ecsctl list clusters
+```
+
+You can also select a profile for one command with `--profile development`, and select a Region with `--region eu-west-2`. Avoid putting long-lived AWS secret keys directly in commands or documentation. See the [AWS SDK credential provider chain](https://docs.aws.amazon.com/sdk-for-go/v2/developer-guide/configure-gosdk.html) for supported credential sources.
 
 ### ECS Exec Plugin (For Container Shell Access)
 To use `ecsctl exec` (which allows you to run interactive shells inside ECS Fargate or EC2 containers), you must install the **AWS Session Manager Plugin** on your local machine.
@@ -106,7 +111,7 @@ To use `ecsctl exec` (which allows you to run interactive shells inside ECS Farg
 * **Linux (RHEL/CentOS)**:
   ```bash
   curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o "session-manager-plugin.rpm"
-  sudo yum install -o "session-manager-plugin.rpm"
+  sudo yum install ./session-manager-plugin.rpm
   ```
 
 ---
@@ -170,27 +175,4 @@ ecsctl completion powershell >> $PROFILE
 
 ---
 
-## Uninstalling ecsctl
-
-If you need to remove `ecsctl` from your system, delete the binary from your configuration directories.
-
-### macOS / Linux
-
-```bash
-# If installed globally (default)
-sudo rm -f /usr/local/bin/ecsctl
-
-# If installed in local user space
-rm -f $HOME/.local/bin/ecsctl
-```
-
-### Windows
-
-Run the following command in PowerShell:
-
-```powershell
-# Remove the installation directory
-Remove-Item -Recurse -Force $HOME\.ecsctl
-```
-
-
+To remove ecsctl, see [Uninstallation](uninstallation.md).

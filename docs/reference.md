@@ -49,6 +49,7 @@ ecsctl
 │   ├── list-contexts
 │   ├── use-context
 │   ├── import
+│   ├── config
 │   └── show
 └── version          - Print build version and compilation information
 ```
@@ -58,14 +59,14 @@ ecsctl
 ## Detailed Command Specifications
 
 ### `apply`
-Create or update resources based on YAML configs.
+Create a cluster, regular ECS service, or Express service from a YAML configuration file, or update configured fields on an existing resource.
 * **Flags**:
   * `-f, --file` (string, required): Path to YAML config file.
   * `--dry-run` (boolean): Show what changes would occur without applying them.
   * `--wait` (boolean): Wait for resource to reach a stable state before exiting.
 
 ### `create`
-Create a new ECS resource and fail if it already exists.
+Create a new ECS resource and fail if it already exists. Clusters and regular ECS services can use a YAML file or inline flags. Express services require a YAML file.
 * **Subcommands**:
   * `create cluster`: Create an ECS cluster.
     * **Flags**:
@@ -137,7 +138,7 @@ Aggregate and stream logs from service tasks.
 * **Flags**:
   * `--cluster` (string, required): Target cluster name.
   * `-f, --follow` (boolean): Stream logs in real-time.
-  * `--tail` (integer): Number of lines to show from the end (defaults to all).
+  * `--tail` (integer): Number of recent lines to show (defaults to 50).
 
 ### `exec`
 Open interactive shell or run commands in a container task.
@@ -146,11 +147,12 @@ Open interactive shell or run commands in a container task.
   * `--cluster` (string, required): Target cluster name.
   * `--container` (string): Target container name.
   * `--command` (string): Command to execute (defaults to shell).
+  * `--task` (string): Choose a specific task; otherwise ecsctl selects a running task for the service.
 
 ### `express`
 Manage ECS Express Mode web services; see [Express Mode guide](express.md).
-* `express create -f FILE [--wait]`: Create from Express service YAML.
-* `express update --service-arn ARN -f FILE [--wait]`: Update a service.
+* `express create -f FILE [--wait]`: Create from a YAML file. It must include `serviceName`, `infrastructureRoleArn`, and either `image` or `taskDefinitionArn`.
+* `express update --service-arn ARN -f FILE [--wait]`: Update from a YAML file.
 * `express describe --service-arn ARN`: Show service status.
 * `express delete --service-arn ARN`: Begin managed service deletion.
 * `express list [--cluster NAME]`: List Express Mode services.
@@ -179,7 +181,7 @@ Manage remote state backend contexts.
   * `state import express <name-or-arn>`: Import an Express service and capture its configuration.
     * **Flags**:
       * `--cluster` (string, required): Cluster name.
-  * `state config <cluster|service|express> [name]`: Print captured YAML configuration. Service and Express resources accept `--cluster`.
+  * `state config <cluster|service|express> <name>`: Print captured YAML configuration. Service and Express resources accept `--cluster`; an active state context is required.
   * `state show`: Print details of active context and tracked resources.
 
 ### `version`
