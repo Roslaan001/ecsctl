@@ -251,7 +251,7 @@ var stateImportCmd = &cobra.Command{
 				}
 			}
 			if arn == "" {
-				return fmt.Errorf("Express service %q not found", resourceName)
+				return fmt.Errorf("express service %q not found", resourceName)
 			}
 			r, err := ecsClient.DescribeExpressServiceResource(ctx, arn)
 			if err != nil {

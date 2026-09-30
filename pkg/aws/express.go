@@ -93,10 +93,10 @@ func (c *Client) ReconcileExpressService(ctx context.Context, arn string, cfg *e
 		return false, fmt.Errorf("describing Express service: %w", err)
 	}
 	if service == nil {
-		return false, fmt.Errorf("Express service %q not found", arn)
+		return false, fmt.Errorf("express service %q not found", arn)
 	}
 	if cfg.ServiceName != "" && aws.ToString(service.ServiceName) != cfg.ServiceName {
-		return false, fmt.Errorf("Express service name %q cannot be changed to %q", aws.ToString(service.ServiceName), cfg.ServiceName)
+		return false, fmt.Errorf("express service name %q cannot be changed to %q", aws.ToString(service.ServiceName), cfg.ServiceName)
 	}
 	if cfg.Cluster != "" && aws.ToString(service.Cluster) != cfg.Cluster {
 		return false, fmt.Errorf("Express service cluster %q cannot be changed to %q", aws.ToString(service.Cluster), cfg.Cluster)
