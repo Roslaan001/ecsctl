@@ -49,7 +49,9 @@ nav:
   - Installation: installation.md
   - Uninstallation: uninstallation.md
   - Declarative Management: declarative.md
+  - ECS Express Mode: express.md
   - Operations & Commands: commands.md
+  - Task Definitions and One-off Tasks: tasks.md
   - Resource Inspection: inspection.md
   - Remote State: state.md
   - CLI Reference: reference.md
