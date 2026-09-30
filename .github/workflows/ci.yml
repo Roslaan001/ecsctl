@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Test
@@ -51,3 +54,44 @@ jobs:
         uses: golangci/golangci-lint-action@v9.3.0
         with:
           version: v2.14.0
+
+  cross-build:
+    name: Cross-build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Cross-build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build ./...
+
+  govulncheck:
+    name: Go vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Scan Go dependencies and reachable code
+        uses: golang/govulncheck-action@v1.1.0

@@ -20,6 +20,8 @@ github.com/aws/aws-sdk-go-v2/service/applicationautoscaling v1.51.1 h1:0KGTJGyje
 github.com/aws/aws-sdk-go-v2/service/applicationautoscaling v1.51.1/go.mod h1:i5P08xu4FfaQFTHEUuoFn9G1OKx2m9HhUtBXZWGQ1Dg=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.35.0 h1:Tpy3mOh9ladwf9bhlAr38OTnZk/Uh9UuN4UNg3MFB/U=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.35.0/go.mod h1:bIFyamdY1PRTmifPT7uHCq4+af0SooBn9hmK9UW/hmg=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.65.0 h1:3yaFbUbuLfN8n1q01wZtQtHRzUDc/jm0VvniMY0IPE8=
+github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.65.0/go.mod h1:PobeppEnIjw4pcgjFryNDZCTH7AiqZw0yb5r98Gvf9c=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.99.1 h1:rVVvtFSTJnHJ+tyrFvzvFGaKv09tygTCAHjFtHju6AY=
 github.com/aws/aws-sdk-go-v2/service/ecs v1.99.1/go.mod h1:1BjycrF8UaNiy2N2Y+piEMKuOtoR7FeYwYTMhEY5Gp8=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 h1:mbRIur/BiHK6SKPjoBIXSE/hJ6g6JGRLuxQy1jGjlN4=
