@@ -99,14 +99,14 @@ func (c *Client) ReconcileExpressService(ctx context.Context, arn string, cfg *e
 		return false, fmt.Errorf("express service name %q cannot be changed to %q", aws.ToString(service.ServiceName), cfg.ServiceName)
 	}
 	if cfg.Cluster != "" && aws.ToString(service.Cluster) != cfg.Cluster {
-		return false, fmt.Errorf("Express service cluster %q cannot be changed to %q", aws.ToString(service.Cluster), cfg.Cluster)
+		return false, fmt.Errorf("express service cluster %q cannot be changed to %q", aws.ToString(service.Cluster), cfg.Cluster)
 	}
 	if cfg.InfrastructureRoleARN != "" && aws.ToString(service.InfrastructureRoleArn) != cfg.InfrastructureRoleARN {
-		return false, fmt.Errorf("Express infrastructure role cannot be changed in place; replace the service")
+		return false, fmt.Errorf("express infrastructure role cannot be changed in place; replace the service")
 	}
 	revision := activeExpressConfiguration(service)
 	if revision == nil {
-		return false, fmt.Errorf("Express service %q has no active configuration to compare", arn)
+		return false, fmt.Errorf("express service %q has no active configuration to compare", arn)
 	}
 	configurationDrift := expressConfigurationDrift(revision, cfg)
 	tagsDrift := cfg.Tags != nil && !tagsEqual(service.Tags, cfg.Tags)
