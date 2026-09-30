@@ -42,7 +42,7 @@ make install
 
 ## Documentation
 
-The full documentation is built with MkDocs and hosted at [ecsctl.abdulsomad005.workers.dev](https://ecsctl.abdulsomad005.workers.dev).
+The full documentation is built with MkDocs and hosted at [ecsctl.abdulsomad005.workers.dev](https://ecsctl.abdulsomad005.workers.dev). Pull requests build the site, and pushes to `main` deploy it to Cloudflare Workers through [the Workers workflow](.github/workflows/workers.yml).
 
 To preview the documentation locally, run:
 
