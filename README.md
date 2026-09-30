@@ -305,9 +305,12 @@ The following flags can be passed to any subcommand to override default configur
 
 ## Build & Test
 
+`make test-floci` uses dummy `test` credentials and a local Floci endpoint; it does not need an AWS account or real AWS keys. The current Floci ECS API does not list the Express Gateway operations, so this integration test covers the standard ECS service lifecycle; Express Mode is not exercised against Floci yet. See the [Floci ECS support matrix](https://floci.io/floci/services/ecs/).
+
 ```bash
 make build     # builds binary to ./bin/ecsctl
 make test      # runs unit tests
+make test-floci # runs ECS integration test against local Floci (requires Docker Compose or Podman)
 make lint      # runs golangci-lint checking
 make clean     # cleans up build outputs and binaries
 ```

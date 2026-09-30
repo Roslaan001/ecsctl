@@ -95,3 +95,32 @@ jobs:
 
       - name: Scan Go dependencies and reachable code
         uses: golang/govulncheck-action@v1.1.0
+
+  floci-integration:
+    name: Floci ECS integration
+    runs-on: ubuntu-latest
+    services:
+      floci:
+        image: floci/floci:2.1.0
+        ports:
+          - 4566:4566
+        env:
+          FLOCI_SERVICES_ECS_MOCK: "true"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Exercise ECS service lifecycle against Floci
+        env:
+          AWS_ENDPOINT_URL: http://127.0.0.1:4566
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: go test -tags=integration ./pkg/aws -run '^TestFlociECSServiceLifecycle$' -count=1 -v

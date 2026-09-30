@@ -28,6 +28,16 @@ type mockECS struct {
 	describeTaskDefOut  *ecs.DescribeTaskDefinitionOutput
 	registerTaskDefIn   *ecs.RegisterTaskDefinitionInput
 	registerTaskDefOut  *ecs.RegisterTaskDefinitionOutput
+	createExpressInput  *ecs.CreateExpressGatewayServiceInput
+	createExpressOut    *ecs.CreateExpressGatewayServiceOutput
+	createExpressErr    error
+	updateExpressInput  *ecs.UpdateExpressGatewayServiceInput
+	updateExpressErr    error
+	describeExpressIn   *ecs.DescribeExpressGatewayServiceInput
+	describeExpressOut  *ecs.DescribeExpressGatewayServiceOutput
+	describeExpressErr  error
+	deleteExpressInput  *ecs.DeleteExpressGatewayServiceInput
+	deleteExpressErr    error
 }
 
 func (m *mockECS) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
@@ -78,17 +88,27 @@ func (m *mockECS) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(
 func (m *mockECS) ExecuteCommand(_ context.Context, _ *ecs.ExecuteCommandInput, _ ...func(*ecs.Options)) (*ecs.ExecuteCommandOutput, error) {
 	panic("unexpected: ExecuteCommand")
 }
-func (m *mockECS) CreateExpressGatewayService(_ context.Context, _ *ecs.CreateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.CreateExpressGatewayServiceOutput, error) {
-	panic("unexpected: CreateExpressGatewayService")
+func (m *mockECS) CreateExpressGatewayService(_ context.Context, input *ecs.CreateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.CreateExpressGatewayServiceOutput, error) {
+	m.createExpressInput = input
+	if m.createExpressOut == nil {
+		m.createExpressOut = &ecs.CreateExpressGatewayServiceOutput{}
+	}
+	return m.createExpressOut, m.createExpressErr
 }
-func (m *mockECS) UpdateExpressGatewayService(_ context.Context, _ *ecs.UpdateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateExpressGatewayServiceOutput, error) {
-	panic("unexpected: UpdateExpressGatewayService")
+func (m *mockECS) UpdateExpressGatewayService(_ context.Context, input *ecs.UpdateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateExpressGatewayServiceOutput, error) {
+	m.updateExpressInput = input
+	return &ecs.UpdateExpressGatewayServiceOutput{}, m.updateExpressErr
 }
-func (m *mockECS) DescribeExpressGatewayService(_ context.Context, _ *ecs.DescribeExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DescribeExpressGatewayServiceOutput, error) {
-	panic("unexpected: DescribeExpressGatewayService")
+func (m *mockECS) DescribeExpressGatewayService(_ context.Context, input *ecs.DescribeExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DescribeExpressGatewayServiceOutput, error) {
+	m.describeExpressIn = input
+	if m.describeExpressOut == nil {
+		m.describeExpressOut = &ecs.DescribeExpressGatewayServiceOutput{}
+	}
+	return m.describeExpressOut, m.describeExpressErr
 }
-func (m *mockECS) DeleteExpressGatewayService(_ context.Context, _ *ecs.DeleteExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteExpressGatewayServiceOutput, error) {
-	panic("unexpected: DeleteExpressGatewayService")
+func (m *mockECS) DeleteExpressGatewayService(_ context.Context, input *ecs.DeleteExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteExpressGatewayServiceOutput, error) {
+	m.deleteExpressInput = input
+	return &ecs.DeleteExpressGatewayServiceOutput{}, m.deleteExpressErr
 }
 func (m *mockECS) RunTask(_ context.Context, _ *ecs.RunTaskInput, _ ...func(*ecs.Options)) (*ecs.RunTaskOutput, error) {
 	panic("unexpected: RunTask")
