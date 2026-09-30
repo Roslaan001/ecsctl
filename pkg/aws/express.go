@@ -301,7 +301,7 @@ func (c *Client) DescribeExpressServiceResource(ctx context.Context, arn string)
 		return nil, fmt.Errorf("describing Express service: %w", err)
 	}
 	if service == nil {
-		return nil, fmt.Errorf("Express service %q not found", arn)
+		return nil, fmt.Errorf("express service %q not found", arn)
 	}
 	cfg := expressConfigFromService(service)
 	serialized, err := yaml.Marshal(cfg)
