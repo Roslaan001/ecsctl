@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ECS Express Mode Service Configuration",
+  "type": "object",
+  "required": ["serviceName", "infrastructureRoleArn"],
+  "properties": {
+    "serviceName": { "type": "string" },
+    "cluster": { "type": "string" },
+    "infrastructureRoleArn": { "type": "string" },
+    "executionRoleArn": { "type": "string" },
+    "taskRoleArn": { "type": "string" },
+    "taskDefinitionArn": { "type": "string" },
+    "image": { "type": "string" },
+    "containerPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "command": { "type": "array", "items": { "type": "string" } },
+    "environment": { "type": "object", "additionalProperties": { "type": "string" } },
+    "secrets": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cpu": { "type": "string" },
+    "memory": { "type": "string" },
+    "cpuArchitecture": { "type": "string", "enum": ["X86_64", "ARM64"] },
+    "healthCheckPath": { "type": "string" },
+    "subnets": { "type": "array", "items": { "type": "string" } },
+    "securityGroups": { "type": "array", "items": { "type": "string" } },
+    "minTaskCount": { "type": "integer", "minimum": 0 },
+    "maxTaskCount": { "type": "integer", "minimum": 1 },
+    "scalingMetric": { "type": "string", "enum": ["AVERAGE_CPU", "AVERAGE_MEMORY", "REQUEST_COUNT_PER_TARGET"] },
+    "scalingTargetValue": { "type": "integer", "minimum": 1 },
+    "tags": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "oneOf": [
+    { "required": ["image"], "not": { "required": ["taskDefinitionArn"] } },
+    { "required": ["taskDefinitionArn"], "not": { "required": ["image"] } }
+  ],
+  "additionalProperties": false
+}

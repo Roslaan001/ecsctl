@@ -177,3 +177,43 @@ cluster: my-cluster
 		t.Fatal("expected error for missing taskDefinition, got nil")
 	}
 }
+
+func TestLoadServiceConfig_AutoScaling(t *testing.T) {
+	path := writeTemp(t, "name: web\ncluster: prod\ntaskDefinition: web:1\nautoScaling:\n  minCapacity: 2\n  maxCapacity: 8\n  metric: Memory\n  targetValue: 70\n")
+	cfg, err := LoadServiceConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AutoScaling == nil || cfg.AutoScaling.MinCapacity != 2 || cfg.AutoScaling.MaxCapacity != 8 || cfg.AutoScaling.Metric != "Memory" {
+		t.Fatalf("autoScaling config not loaded: %#v", cfg.AutoScaling)
+	}
+}
+
+func TestLoadServiceConfig_RejectsInvalidAutoScalingRange(t *testing.T) {
+	path := writeTemp(t, "name: web\ncluster: prod\ntaskDefinition: web:1\nautoScaling:\n  minCapacity: 9\n  maxCapacity: 2\n")
+	if _, err := LoadServiceConfig(path); err == nil {
+		t.Fatal("expected invalid capacity range to fail")
+	}
+}
+
+func TestLoadExpressServiceConfig_ImageService(t *testing.T) {
+	path := writeTemp(t, "serviceName: api\ninfrastructureRoleArn: arn:aws:iam::123456789012:role/express\nimage: nginx:latest\ncontainerPort: 8080\nscalingMetric: AVERAGE_CPU\n")
+	cfg, err := LoadExpressServiceConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ServiceName != "api" || cfg.Image != "nginx:latest" || cfg.ContainerPort != 8080 {
+		t.Fatalf("Express config not loaded: %#v", cfg)
+	}
+}
+
+func TestLoadExpressServiceConfig_RequiresExactlyOneImageOrTaskDefinition(t *testing.T) {
+	for _, content := range []string{
+		"serviceName: api\ninfrastructureRoleArn: role\n",
+		"serviceName: api\ninfrastructureRoleArn: role\nimage: nginx\ntaskDefinitionArn: arn:aws:ecs:task-definition/api:1\n",
+	} {
+		if _, err := LoadExpressServiceConfig(writeTemp(t, content)); err == nil {
+			t.Fatalf("expected invalid Express config to fail: %s", content)
+		}
+	}
+}

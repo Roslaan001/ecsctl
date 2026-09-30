@@ -20,10 +20,12 @@ import (
 //	  env: production
 //	  team: platform
 type ClusterConfig struct {
-	Name              string            `yaml:"name"`
-	Region            string            `yaml:"region"`
-	CapacityProviders []string          `yaml:"capacityProviders"`
-	Tags              map[string]string `yaml:"tags"`
+	Name                            string                           `yaml:"name"`
+	Region                          string                           `yaml:"region"`
+	CapacityProviders               []string                         `yaml:"capacityProviders"`
+	DefaultCapacityProviderStrategy []CapacityProviderStrategyConfig `yaml:"defaultCapacityProviderStrategy"`
+	ServiceConnectDefaultsNamespace string                           `yaml:"serviceConnectDefaultsNamespace"`
+	Tags                            map[string]string                `yaml:"tags"`
 }
 
 // NetworkConfig holds VPC networking settings for a service.
@@ -31,6 +33,101 @@ type NetworkConfig struct {
 	Subnets        []string `yaml:"subnets"`
 	SecurityGroups []string `yaml:"securityGroups"`
 	AssignPublicIP string   `yaml:"assignPublicIp"` // ENABLED | DISABLED
+}
+
+type CapacityProviderStrategyConfig struct {
+	CapacityProvider string `yaml:"capacityProvider"`
+	Weight           int32  `yaml:"weight"`
+	Base             int32  `yaml:"base"`
+}
+
+type DeploymentControllerConfig struct {
+	Type string `yaml:"type"`
+}
+type DeploymentCircuitBreakerConfig struct {
+	Enable   bool `yaml:"enable"`
+	Rollback bool `yaml:"rollback"`
+}
+type DeploymentAlarmConfig struct {
+	Name     string `yaml:"name"`
+	Enable   bool   `yaml:"enable"`
+	Rollback bool   `yaml:"rollback"`
+}
+type DeploymentConfigurationConfig struct {
+	MaximumPercent           int32                           `yaml:"maximumPercent"`
+	MinimumHealthyPercent    int32                           `yaml:"minimumHealthyPercent"`
+	DeploymentCircuitBreaker *DeploymentCircuitBreakerConfig `yaml:"deploymentCircuitBreaker"`
+	Alarms                   []DeploymentAlarmConfig         `yaml:"alarms"`
+	Strategy                 string                          `yaml:"strategy"`
+	BakeTimeInMinutes        int32                           `yaml:"bakeTimeInMinutes"`
+}
+type LoadBalancerConfig struct {
+	TargetGroupARN string `yaml:"targetGroupArn"`
+	ContainerName  string `yaml:"containerName"`
+	ContainerPort  int32  `yaml:"containerPort"`
+}
+type ServiceRegistryConfig struct {
+	RegistryARN   string `yaml:"registryArn"`
+	Port          int32  `yaml:"port"`
+	ContainerName string `yaml:"containerName"`
+	ContainerPort int32  `yaml:"containerPort"`
+}
+type PlacementConstraintConfig struct {
+	Type       string `yaml:"type"`
+	Expression string `yaml:"expression"`
+}
+type PlacementStrategyConfig struct {
+	Type  string `yaml:"type"`
+	Field string `yaml:"field"`
+}
+
+type ServiceConnectClientAliasConfig struct {
+	DNSName string `yaml:"dnsName"`
+	Port    int32  `yaml:"port"`
+}
+type ServiceConnectServiceConfig struct {
+	PortName            string                            `yaml:"portName"`
+	DiscoveryName       string                            `yaml:"discoveryName"`
+	IngressPortOverride int32                             `yaml:"ingressPortOverride"`
+	ClientAliases       []ServiceConnectClientAliasConfig `yaml:"clientAliases"`
+}
+type ServiceConnectConfig struct {
+	Enabled   bool                          `yaml:"enabled"`
+	Namespace string                        `yaml:"namespace"`
+	Services  []ServiceConnectServiceConfig `yaml:"services"`
+}
+type ServiceAutoScalingConfig struct {
+	MinCapacity int32   `yaml:"minCapacity"`
+	MaxCapacity int32   `yaml:"maxCapacity"`
+	Metric      string  `yaml:"metric"`
+	TargetValue float64 `yaml:"targetValue"`
+}
+
+// ExpressServiceConfig describes an ECS Express Mode web service. ECS creates
+// and manages the supporting load balancer, URL, scaling, logs, and alarms.
+type ExpressServiceConfig struct {
+	ServiceName           string            `yaml:"serviceName"`
+	Cluster               string            `yaml:"cluster"`
+	InfrastructureRoleARN string            `yaml:"infrastructureRoleArn"`
+	ExecutionRoleARN      string            `yaml:"executionRoleArn"`
+	TaskRoleARN           string            `yaml:"taskRoleArn"`
+	TaskDefinitionARN     string            `yaml:"taskDefinitionArn"`
+	Image                 string            `yaml:"image"`
+	ContainerPort         int32             `yaml:"containerPort"`
+	Command               []string          `yaml:"command"`
+	Environment           map[string]string `yaml:"environment"`
+	Secrets               map[string]string `yaml:"secrets"`
+	CPU                   string            `yaml:"cpu"`
+	Memory                string            `yaml:"memory"`
+	CPUArchitecture       string            `yaml:"cpuArchitecture"`
+	HealthCheckPath       string            `yaml:"healthCheckPath"`
+	Subnets               []string          `yaml:"subnets"`
+	SecurityGroups        []string          `yaml:"securityGroups"`
+	MinTaskCount          int32             `yaml:"minTaskCount"`
+	MaxTaskCount          int32             `yaml:"maxTaskCount"`
+	ScalingMetric         string            `yaml:"scalingMetric"`
+	ScalingTargetValue    int32             `yaml:"scalingTargetValue"`
+	Tags                  map[string]string `yaml:"tags"`
 }
 
 // ServiceConfig represents the YAML config for creating an ECS service.
@@ -51,13 +148,27 @@ type NetworkConfig struct {
 //	tags:
 //	  env: production
 type ServiceConfig struct {
-	Name           string            `yaml:"name"`
-	Cluster        string            `yaml:"cluster"`
-	TaskDefinition string            `yaml:"taskDefinition"`
-	LaunchType     string            `yaml:"launchType"`
-	DesiredCount   int32             `yaml:"desiredCount"`
-	NetworkConfig  *NetworkConfig    `yaml:"network"`
-	Tags           map[string]string `yaml:"tags"`
+	Name                          string                           `yaml:"name"`
+	Cluster                       string                           `yaml:"cluster"`
+	TaskDefinition                string                           `yaml:"taskDefinition"`
+	LaunchType                    string                           `yaml:"launchType"`
+	DesiredCount                  int32                            `yaml:"desiredCount"`
+	NetworkConfig                 *NetworkConfig                   `yaml:"network"`
+	Tags                          map[string]string                `yaml:"tags"`
+	CapacityProviderStrategy      []CapacityProviderStrategyConfig `yaml:"capacityProviderStrategy"`
+	DeploymentController          *DeploymentControllerConfig      `yaml:"deploymentController"`
+	DeploymentConfiguration       *DeploymentConfigurationConfig   `yaml:"deploymentConfiguration"`
+	LoadBalancers                 []LoadBalancerConfig             `yaml:"loadBalancers"`
+	ServiceRegistries             []ServiceRegistryConfig          `yaml:"serviceRegistries"`
+	HealthCheckGracePeriodSeconds int32                            `yaml:"healthCheckGracePeriodSeconds"`
+	EnableExecuteCommand          *bool                            `yaml:"enableExecuteCommand"`
+	EnableECSManagedTags          *bool                            `yaml:"enableECSManagedTags"`
+	PropagateTags                 string                           `yaml:"propagateTags"`
+	PlatformVersion               string                           `yaml:"platformVersion"`
+	PlacementConstraints          []PlacementConstraintConfig      `yaml:"placementConstraints"`
+	PlacementStrategy             []PlacementStrategyConfig        `yaml:"placementStrategy"`
+	ServiceConnect                *ServiceConnectConfig            `yaml:"serviceConnect"`
+	AutoScaling                   *ServiceAutoScalingConfig        `yaml:"autoScaling"`
 }
 
 // DetectResourceType reads a YAML file and returns "cluster" or "service"
@@ -129,6 +240,46 @@ func LoadServiceConfig(path string) (*ServiceConfig, error) {
 	if cfg.DesiredCount == 0 {
 		cfg.DesiredCount = 1
 	}
+	if cfg.AutoScaling != nil {
+		if cfg.AutoScaling.MinCapacity < 0 || cfg.AutoScaling.MaxCapacity <= 0 || cfg.AutoScaling.MinCapacity > cfg.AutoScaling.MaxCapacity {
+			return nil, fmt.Errorf("config file %q: autoScaling requires 0 <= minCapacity <= maxCapacity and maxCapacity > 0", path)
+		}
+		if cfg.AutoScaling.TargetValue < 0 {
+			return nil, fmt.Errorf("config file %q: autoScaling.targetValue must be positive", path)
+		}
+		metric := cfg.AutoScaling.Metric
+		if metric != "" && metric != "CPU" && metric != "Memory" && metric != "cpu" && metric != "memory" {
+			return nil, fmt.Errorf("config file %q: autoScaling.metric must be CPU or Memory", path)
+		}
+	}
 
+	return &cfg, nil
+}
+
+// LoadExpressServiceConfig reads the configuration for an ECS Express Mode service.
+func LoadExpressServiceConfig(path string) (*ExpressServiceConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config file %q: %w", path, err)
+	}
+	var cfg ExpressServiceConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+	if cfg.ServiceName == "" {
+		return nil, fmt.Errorf("config file %q: 'serviceName' is required", path)
+	}
+	if cfg.InfrastructureRoleARN == "" {
+		return nil, fmt.Errorf("config file %q: 'infrastructureRoleArn' is required", path)
+	}
+	if cfg.TaskDefinitionARN == "" && cfg.Image == "" {
+		return nil, fmt.Errorf("config file %q: either 'taskDefinitionArn' or 'image' is required", path)
+	}
+	if cfg.TaskDefinitionARN != "" && cfg.Image != "" {
+		return nil, fmt.Errorf("config file %q: set either 'taskDefinitionArn' or 'image', not both", path)
+	}
+	if cfg.ScalingMetric != "" && cfg.ScalingMetric != "AVERAGE_CPU" && cfg.ScalingMetric != "AVERAGE_MEMORY" && cfg.ScalingMetric != "REQUEST_COUNT_PER_TARGET" {
+		return nil, fmt.Errorf("config file %q: scalingMetric must be AVERAGE_CPU, AVERAGE_MEMORY, or REQUEST_COUNT_PER_TARGET", path)
+	}
 	return &cfg, nil
 }

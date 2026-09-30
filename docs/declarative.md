@@ -61,6 +61,10 @@ region: us-east-1
 capacityProviders:
   - FARGATE
   - FARGATE_SPOT
+defaultCapacityProviderStrategy:
+  - capacityProvider: FARGATE
+    weight: 1
+serviceConnectDefaultsNamespace: prod.local
 tags:
   env: production
   team: platform
@@ -73,6 +77,8 @@ tags:
 | `name` | string | Name of the ECS cluster. |
 | `region` | string | AWS region where the cluster will reside. |
 | `capacityProviders` | list | List of capacity providers (e.g. `FARGATE`, `FARGATE_SPOT`). |
+| `defaultCapacityProviderStrategy` | list | Default providers with optional `weight` and `base`. |
+| `serviceConnectDefaultsNamespace` | string | Default Cloud Map namespace for Service Connect. |
 | `tags` | map | Key-value pairs for resource tagging. |
 
 ---
@@ -94,6 +100,22 @@ network:
   securityGroups:
     - sg-0aa123456789abcde
   assignPublicIp: ENABLED
+capacityProviderStrategy:
+  - capacityProvider: FARGATE
+    weight: 1
+deploymentConfiguration:
+  deploymentCircuitBreaker:
+    enable: true
+    rollback: true
+loadBalancers:
+  - targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/app/abc123
+    containerName: web
+    containerPort: 8080
+autoScaling:
+  minCapacity: 2
+  maxCapacity: 10
+  metric: CPU
+  targetValue: 65
 tags:
   env: production
 ```
@@ -110,7 +132,22 @@ tags:
 | `network.subnets` | list | Subnet IDs where tasks will be spawned. |
 | `network.securityGroups`| list | Security Group IDs to associate with the tasks. |
 | `network.assignPublicIp`| string | Whether to assign public IP (`ENABLED` or `DISABLED`). |
+| `capacityProviderStrategy` | list | Capacity providers, weights, and optional base task counts. |
+| `deploymentController` | object | ECS rolling, CodeDeploy blue/green, or external deployment controller. |
+| `deploymentConfiguration` | object | Rolling limits, circuit breaker/rollback, alarms, deployment strategy, and bake time. |
+| `loadBalancers` | list | Target groups and task container/port mappings. |
+| `serviceRegistries` | list | Cloud Map service registry mappings. |
+| `serviceConnect` | object | Service Connect namespace, services, and client aliases. |
+| `autoScaling` | object | Application Auto Scaling min/max task counts and CPU or memory target tracking. |
+| `enableExecuteCommand` | boolean | Enable ECS Exec for service tasks. |
+| `enableECSManagedTags` | boolean | Apply ECS managed tags to tasks. |
+| `propagateTags` | string | Propagate `SERVICE` or `TASK_DEFINITION` tags. |
+| `platformVersion` | string | Fargate platform version. |
+| `healthCheckGracePeriodSeconds` | integer | Time to ignore load balancer health checks after task start. |
+| `placementConstraints`, `placementStrategy` | list | ECS task placement constraints and strategies. |
 | `tags` | map | Key-value pairs for resource tagging. |
+
+`apply` reconciles the task definition, desired count, configured service settings, and tags. Fields left out of the file are not treated as requests to clear an existing setting. Auto scaling is applied through Application Auto Scaling; the caller needs permission to register scalable targets and scaling policies.
 
 ---
 

@@ -20,12 +20,33 @@
       },
       "description": "List of capacity providers."
     },
+    "defaultCapacityProviderStrategy": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/capacityProvider" },
+      "description": "Default capacity provider strategy used by service and task launches."
+    },
+    "serviceConnectDefaultsNamespace": {
+      "type": "string",
+      "description": "Cloud Map namespace used by new Service Connect-enabled services."
+    },
     "tags": {
       "type": "object",
       "additionalProperties": {
         "type": "string"
       },
       "description": "Key-value pairs for resource tags."
+    }
+  },
+  "definitions": {
+    "capacityProvider": {
+      "type": "object",
+      "properties": {
+        "capacityProvider": { "type": "string" },
+        "weight": { "type": "integer", "minimum": 0 },
+        "base": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["capacityProvider"],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false
