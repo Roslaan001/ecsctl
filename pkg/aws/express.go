@@ -111,7 +111,7 @@ func (c *Client) WaitForExpressService(ctx context.Context, arn string) error {
 				return nil
 			}
 			if service.Status.StatusCode == types.ExpressGatewayServiceStatusCodeInactive {
-				return fmt.Errorf("Express service became inactive: %s", aws.ToString(service.Status.StatusReason))
+				return fmt.Errorf("express service became inactive: %s", aws.ToString(service.Status.StatusReason))
 			}
 		}
 		select {

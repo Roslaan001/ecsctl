@@ -506,7 +506,6 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 		PlacementConstraints:    td.PlacementConstraints,
 		ProxyConfiguration:      td.ProxyConfiguration,
 		RuntimePlatform:         td.RuntimePlatform,
-		InferenceAccelerators:   td.InferenceAccelerators,
 		Tags:                    tdOut.Tags,
 	})
 	if err != nil {

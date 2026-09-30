@@ -13,7 +13,7 @@ import (
 
 func (c *Client) configureServiceAutoScaling(ctx context.Context, cfg *ecscfg.ServiceConfig) error {
 	if c.autoscaling == nil {
-		return fmt.Errorf("Application Auto Scaling client is unavailable")
+		return fmt.Errorf("application auto scaling client is unavailable")
 	}
 	resourceID := fmt.Sprintf("service/%s/%s", cfg.Cluster, cfg.Name)
 	_, err := c.autoscaling.RegisterScalableTarget(ctx, &applicationautoscaling.RegisterScalableTargetInput{
