@@ -1,6 +1,8 @@
 # Declarative Resource Management
 
-`ecsctl` supports managing Amazon ECS resources declaratively using YAML configuration files. This allows you to store your infrastructure configurations in git and build GitOps workflows.
+`ecsctl` can create or update ECS clusters and services from YAML configuration files. The file describes the settings you want ecsctl to manage, so you can review changes in Git and apply them again later.
+
+The configuration file stays on your machine or in your repository. It is not remote state: S3 remote state is optional and is used to record which resources ecsctl has tracked. See [Remote State](state.md) for details.
 
 > [!TIP]
 > Ready-to-use templates are available in the [examples/](https://github.com/Roslaan001/ecsctl/tree/main/examples) directory of the repository.
@@ -9,21 +11,23 @@
 
 ## The `apply` Command
 
-The `apply` command creates a resource if it doesn't exist, or reconciles configured fields when they differ from the live AWS resource state. Omitted fields are left unchanged.
+The `apply` command reads one configuration file and detects whether it describes a cluster, regular ECS service, or Express service. It creates the resource if it is missing. If it exists, ecsctl compares the fields in the file with AWS and updates configured fields that differ. Fields you leave out are not treated as requests to clear existing settings.
+
+`apply` sends changes to AWS unless you include `--dry-run`. It does not require an S3 state context.
 
 ```bash
 ecsctl apply -f <configuration-file>.yaml [flags]
 ```
 
-### Dry Run
-To preview changes without actually applying them to AWS, use the `--dry-run` flag. This is highly useful in CI pull requests to inspect what changes will be introduced:
+### Preview changes
+To see what ecsctl would change without sending the update to AWS, use `--dry-run`:
 
 ```bash
 ecsctl apply -f cluster.yaml --dry-run
 ```
 
-### Waiting for Stability
-By default, some operations are asynchronous. If you want the CLI to block and wait until the resource reaches a stable/running state (e.g. all tasks in a service are running and healthy), use the `--wait` flag:
+### Wait for a service
+ECS may take time to start tasks and make a service healthy. Add `--wait` when you want the command to stay open until the service reaches a stable state:
 
 ```bash
 ecsctl apply -f service.yaml --wait
@@ -149,28 +153,28 @@ tags:
 | `placementConstraints`, `placementStrategy` | list | ECS task placement constraints and strategies. |
 | `tags` | map | Key-value pairs for resource tagging. |
 
-`apply` reconciles the task definition, desired count, configured service settings, and tags. Fields left out of the file are not treated as requests to clear an existing setting. Auto scaling is applied through Application Auto Scaling; the caller needs permission to register scalable targets and scaling policies.
+`apply` reconciles the task definition, desired count, configured service settings, and tags. For Fargate services, include the VPC subnets and security groups the tasks should use. Auto scaling is configured through Application Auto Scaling; the AWS identity running ecsctl needs permission to register scalable targets and scaling policies.
 
 For existing clusters, `apply` reconciles configured capacity providers, the default capacity-provider strategy, Service Connect defaults, and tags. Providers named in a configured default strategy are attached automatically when `capacityProviders` is omitted. If you set `capacityProviders` without a strategy, keep every provider used by the cluster's existing default strategy in the list; apply rejects inconsistent combinations before updating AWS.
 
 ECS does not support changing directly from one launch type to another through `UpdateService`. When `launchType` differs, apply returns an error instead of silently ignoring it; use a supported capacity-provider strategy migration or replace the service.
 
-### ECS Express Mode Services
+### ECS Express Mode services
 
-Express services use their own resource shape and can also be managed declaratively:
+Express services use a different configuration shape from regular ECS services. They can also be managed declaratively:
 
 ```bash
 ecsctl apply -f express.yaml --wait
 ecsctl express list --cluster production
 ```
 
-See the [Express Mode guide](express.md) for the supported fields and lifecycle commands.
+`express.yaml` must contain Express service settings. It is not interchangeable with a regular `service.yaml`. See the [Express Mode guide](express.md) for a complete example, required fields, and the create/update workflow.
 
 ---
 
 ## The `create` Command
 
-The `create` command explicitly creates new resources on AWS and registers them in the remote state backend (if configured). Unlike `apply`, it will fail if the resource already exists. 
+The `create` command explicitly creates a new cluster or service in AWS. Unlike `apply`, it fails if that resource already exists. If an S3 state context is configured, ecsctl also records the resource there; without one, the AWS resource is still created.
 
 You can run `create` in two ways: using a **YAML configuration file** or using **inline CLI flags**.
 
@@ -200,9 +204,9 @@ ecsctl create service --name my-service --cluster my-cluster --task-definition m
 
 ---
 
-## The `delete` Command
+## The `delete` command
 
-To delete resources defined in your files, or directly by their name:
+Delete an existing resource by its name. These commands do not read a YAML file:
 
 ```bash
 # Delete a service by name
@@ -211,3 +215,5 @@ ecsctl delete service my-service --cluster my-cluster
 # Delete a cluster by name
 ecsctl delete cluster my-cluster
 ```
+
+Deleting a service stops its running tasks. Deleting a cluster requires it to contain no services or other resources that prevent deletion.

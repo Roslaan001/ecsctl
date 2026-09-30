@@ -1,24 +1,64 @@
 # Task definitions and one-off tasks
 
-Register a standard ECS task definition from the JSON shape accepted by `RegisterTaskDefinition`:
+An ECS task definition is a reusable blueprint for a task. It describes the container image, CPU and memory, roles, environment, logging, and other runtime settings. An ECS service keeps tasks running and replaces them when needed; a one-off task runs independently and exits when its command finishes.
+
+This guide covers registering a task definition and starting or stopping one-off Fargate tasks. It does not cover creating an ECS service; see [Declarative Resource Management](declarative.md) for services.
+
+## Register a task definition
+
+`ecsctl register task-definition` reads an ECS task definition document in JSON format. The file must include a `family` and `containerDefinitions`:
+
+```json
+{
+  "family": "batch-job",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "public.ecr.aws/docker/library/busybox:latest",
+      "essential": true,
+      "command": ["sh", "-c", "echo job complete"]
+    }
+  ]
+}
+```
+
+Save it as `task-definition.json`, then register it:
 
 ```bash
 ecsctl register task-definition -f task-definition.json
 ```
 
-The JSON should include `family` and `containerDefinitions`; the other supported ECS task definition fields pass through to the AWS API. `ecsctl deploy` copies all registrable task-level settings, including runtime platform, ephemeral storage, fault injection, placement constraints, proxy settings, and tags, while changing only the selected container image.
+ECS assigns a revision number to the task definition. Use the returned family and revision, such as `batch-job:1`, when starting a task. For all accepted fields, see the [Amazon ECS `RegisterTaskDefinition` API](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RegisterTaskDefinition.html).
 
-Run a standalone Fargate task. Subnets and security groups are needed for tasks using `awsvpc` networking:
+`ecsctl deploy` uses the current task definition as a starting point, changes the selected container's image, registers a new revision, and updates the service. It preserves the other registrable task-level settings. See [Operations & Commands](commands.md).
 
-```bash
-ecsctl run-task --cluster production --task-definition batch-job:4 \
-  --count 1 --subnets subnet-a,subnet-b --security-groups sg-a
-```
+## Run a one-off Fargate task
 
-Stop a task by ID or ARN:
+Use `run-task` for work that should run once without an ECS service keeping it alive. For Fargate tasks that use `awsvpc` networking, provide subnets and, when needed, security groups that allow the container to reach its dependencies:
 
 ```bash
-ecsctl stop-task --cluster production --task arn:aws:ecs:us-east-1:123456789012:task/production/abc123
+ecsctl run-task \
+  --cluster production \
+  --task-definition batch-job:1 \
+  --count 1 \
+  --subnets subnet-a,subnet-b \
+  --security-groups sg-a
 ```
 
-These commands use ECS task APIs directly and do not create a service or keep the task running after it exits.
+The command starts one task and prints its identifier. Increase `--count` to start more than one copy. The task may stop on its own when its container process exits; ECS does not restart it through a service scheduler.
+
+ecsctl leaves public IP assignment disabled by default. Set `--assign-public-ip ENABLED` only when that matches your VPC design. Otherwise, the task's subnets need a route or VPC endpoint for the services the container must reach.
+
+## Stop a running task
+
+Use the task ID or full task ARN printed by `run-task` or `ecsctl list tasks`:
+
+```bash
+ecsctl stop-task --cluster production --task <task-id-or-arn>
+```
+
+This requests that ECS stop the task; the task can remain in `STOPPING` briefly. Stopping it interrupts its current work. It does not delete the task definition or create a replacement task. Use `--reason` to include a reason in the stop request.

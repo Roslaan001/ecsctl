@@ -4,71 +4,79 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Roslaan001/ecsctl/blob/main/LICENSE)
 
-`ecsctl` is a CLI tool for managing Amazon ECS (Elastic Container Service) resources, heavily inspired by `eksctl` for EKS. It simplifies operating ECS clusters, services, and tasks by providing both a declarative YAML-based GitOps workflow and simple, fast imperative commands for day-to-day operations.
+`ecsctl` is a command-line tool for creating and operating Amazon ECS clusters, services, and tasks. Use configuration files when you want to describe a resource and reconcile it over time. Use direct commands for one-time operations such as running a task, checking logs, or deploying a new image.
 
+Use the guides in this order if you are new to ecsctl:
 
----
+1. [Install ecsctl and configure AWS access](installation.md).
+2. [Create or update clusters and services](declarative.md).
+3. [Inspect resources and run common operations](inspection.md) and [commands](commands.md).
+4. [Set up shared remote state](state.md) if you want ecsctl to track resources in S3.
 
-## Key Features
+## What you need
 
-* 🚀 **Declarative Resource Management**: Create, update, or reconcile ECS clusters and services using GitOps-friendly YAML configurations (with support for `--dry-run` and `--wait`).
-* ⚡ **Imperative Operations**: Stream logs across service tasks (`ecsctl logs`), open interactive shells (`ecsctl exec`), deploy images while preserving task-definition settings (`ecsctl deploy`), and run or stop standalone tasks.
-* 🚀 **Express Mode**: Create, update, inspect, and delete ECS Express Mode services with managed ingress and scaling (`ecsctl express`).
-* 📈 **Service Controls**: Reconcile capacity providers, deployment safety, load balancing, Service Connect, tags, placement, ECS Exec, and Application Auto Scaling from YAML.
-* 📊 **Inspection & Querying**: Fast listing (`ecsctl list`) and detailed descriptions (`ecsctl describe`) of ECS clusters, services, and tasks.
-* 🔒 **Remote State Backend**: Track your ecsctl-managed resources in an S3-based remote state context manager, similar to Terraform, supporting context switching (`ecsctl state`).
-* 🔑 **Native AWS Auth**: Integrates natively with the standard AWS credential chain (`~/.aws/credentials`, IAM roles, environment variables).
+To manage live resources, you need:
 
----
+- An AWS account with an ECS cluster or permission to create one.
+- AWS credentials with permission to perform the operation you are running.
+- An AWS Region. You can set it in your AWS profile or pass `--region` to a command.
 
-## Quick Start
+You do not need to initialize remote state to use ecsctl. Without a configured state context, commands that support state tracking still call AWS directly. Remote state is an optional shared record of the resources you manage.
 
-### 1. Install ecsctl
-Run the installation script to fetch the latest precompiled release:
+## Quick start
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
-```
-
-### 2. Configure AWS Credentials
-Ensure you have your AWS credentials configured:
+First, install ecsctl and configure AWS credentials. See the [installation guide](installation.md) for the supported credential methods. Confirm the CLI is available:
 
 ```bash
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_REGION="us-east-1"
+ecsctl version
 ```
 
-### 3. Initialize Remote State
-Start tracking your resources in a shared S3 state bucket:
-
-```bash
-ecsctl state init --context production --bucket my-ecsctl-production-state --region us-east-1
-```
-
-### 4. Create your First Cluster
-Create a file named `cluster.yaml`:
+Choose a name and Region for your cluster. Save this configuration as `cluster.yaml`:
 
 ```yaml
 name: my-cluster
-region: us-east-1
+region: eu-west-2
 capacityProviders:
   - FARGATE
   - FARGATE_SPOT
 tags:
-  env: production
-  team: platform
+  environment: development
 ```
 
-Apply the configuration:
+Apply the file to AWS:
 
 ```bash
-ecsctl apply -f cluster.yaml --wait
+ecsctl apply -f cluster.yaml
 ```
 
-### 5. Inspect the Cluster
-Retrieve the live configuration and status of the cluster:
+`apply` creates the cluster if it does not exist. If it already exists, ecsctl reconciles the fields in the file and leaves fields you did not specify unchanged. The YAML file is an input on your machine; ecsctl does not create it for you.
+
+Confirm the cluster exists:
 
 ```bash
 ecsctl describe cluster my-cluster
 ```
+
+This creates a cluster only. To run an application, you also need an ECS task definition and a service configuration. Continue with the [declarative management guide](declarative.md), or use [ECS Express Mode](express.md) if you want ECS to manage the service's ingress and scaling resources.
+
+## Optional: share resource state with a team
+
+Remote state records which resources ecsctl manages in an S3 bucket. Set it up when you want multiple operators or automation to share that record:
+
+```bash
+ecsctl state init --context development --bucket my-ecsctl-state --region eu-west-2
+```
+
+This command creates the bucket if it does not exist, enables bucket versioning, and saves the `development` context in `~/.ecsctl/config.yaml`. Your AWS identity needs permission to inspect and create the bucket and enable versioning. See [Remote State](state.md) for contexts, imports, and recovery details.
+
+## Guides
+
+- [Installation and AWS credentials](installation.md)
+- [Declarative configuration](declarative.md)
+- [ECS Express Mode](express.md)
+- [Operations and commands](commands.md)
+- [Resource inspection](inspection.md)
+- [Remote state](state.md)
+- [Task definitions and one-off tasks](tasks.md)
+- [Complete CLI reference](reference.md)
+- [Uninstallation](uninstallation.md)
