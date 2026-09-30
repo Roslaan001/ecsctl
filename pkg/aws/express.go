@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -82,6 +83,173 @@ func (c *Client) UpdateExpressService(ctx context.Context, arn string, cfg *ecsc
 	}
 	_, err := c.ecs.UpdateExpressGatewayService(ctx, in)
 	return err
+}
+
+// ReconcileExpressService compares configured fields with the active revision
+// and updates only when a difference is present. Unspecified fields are left alone.
+func (c *Client) ReconcileExpressService(ctx context.Context, arn string, cfg *ecscfg.ExpressServiceConfig, dryRun bool) (bool, error) {
+	service, err := c.DescribeExpressService(ctx, arn)
+	if err != nil {
+		return false, fmt.Errorf("describing Express service: %w", err)
+	}
+	if service == nil {
+		return false, fmt.Errorf("Express service %q not found", arn)
+	}
+	if cfg.ServiceName != "" && aws.ToString(service.ServiceName) != cfg.ServiceName {
+		return false, fmt.Errorf("Express service name %q cannot be changed to %q", aws.ToString(service.ServiceName), cfg.ServiceName)
+	}
+	if cfg.Cluster != "" && aws.ToString(service.Cluster) != cfg.Cluster {
+		return false, fmt.Errorf("Express service cluster %q cannot be changed to %q", aws.ToString(service.Cluster), cfg.Cluster)
+	}
+	if cfg.InfrastructureRoleARN != "" && aws.ToString(service.InfrastructureRoleArn) != cfg.InfrastructureRoleARN {
+		return false, fmt.Errorf("Express infrastructure role cannot be changed in place; replace the service")
+	}
+	revision := activeExpressConfiguration(service)
+	if revision == nil {
+		return false, fmt.Errorf("Express service %q has no active configuration to compare", arn)
+	}
+	configurationDrift := expressConfigurationDrift(revision, cfg)
+	tagsDrift := cfg.Tags != nil && !tagsEqual(service.Tags, cfg.Tags)
+	drift := configurationDrift || tagsDrift
+	if !drift {
+		return false, nil
+	}
+	if dryRun {
+		fmt.Printf("[dry-run] Would reconcile configured fields for Express service %q.\n", cfg.ServiceName)
+		return true, nil
+	}
+	if configurationDrift {
+		if err := c.UpdateExpressService(ctx, arn, cfg); err != nil {
+			return false, fmt.Errorf("updating Express service: %w", err)
+		}
+	}
+	if tagsDrift {
+		if err := c.reconcileTags(ctx, aws.ToString(service.ServiceArn), service.Tags, cfg.Tags); err != nil {
+			return false, fmt.Errorf("reconciling Express service tags: %w", err)
+		}
+	}
+	fmt.Printf("✓ Express service %q updated.\n", cfg.ServiceName)
+	return true, nil
+}
+
+func activeExpressConfiguration(service *types.ECSExpressGatewayService) *types.ExpressGatewayServiceConfiguration {
+	for i := range service.ActiveConfigurations {
+		if aws.ToString(service.ActiveConfigurations[i].ServiceRevisionArn) == aws.ToString(service.CurrentDeployment) {
+			return &service.ActiveConfigurations[i]
+		}
+	}
+	if len(service.ActiveConfigurations) > 0 {
+		return &service.ActiveConfigurations[0]
+	}
+	return nil
+}
+
+func expressConfigurationDrift(current *types.ExpressGatewayServiceConfiguration, cfg *ecscfg.ExpressServiceConfig) bool {
+	if cfg.TaskDefinitionARN != "" {
+		if taskDefinitionRef(aws.ToString(current.TaskDefinitionArn)) != taskDefinitionRef(cfg.TaskDefinitionARN) {
+			return true
+		}
+	} else {
+		container := current.PrimaryContainer
+		if container == nil || aws.ToString(container.Image) != cfg.Image {
+			return true
+		}
+		if cfg.ContainerPort != 0 && aws.ToInt32(container.ContainerPort) != cfg.ContainerPort {
+			return true
+		}
+		if cfg.Command != nil && !reflect.DeepEqual(container.Command, cfg.Command) {
+			return true
+		}
+		if cfg.Environment != nil && !reflect.DeepEqual(expressEnvironmentMap(container.Environment), cfg.Environment) {
+			return true
+		}
+		if cfg.Secrets != nil && !reflect.DeepEqual(expressSecretsMap(container.Secrets), cfg.Secrets) {
+			return true
+		}
+		if cfg.AWSLogsConfiguration != nil && (container.AwsLogsConfiguration == nil ||
+			aws.ToString(container.AwsLogsConfiguration.LogGroup) != cfg.AWSLogsConfiguration.LogGroup ||
+			aws.ToString(container.AwsLogsConfiguration.LogStreamPrefix) != cfg.AWSLogsConfiguration.LogStreamPrefix) {
+			return true
+		}
+		if cfg.RepositoryCredentials != nil && (container.RepositoryCredentials == nil ||
+			aws.ToString(container.RepositoryCredentials.CredentialsParameter) != cfg.RepositoryCredentials.CredentialsParameter) {
+			return true
+		}
+	}
+	if cfg.ExecutionRoleARN != "" && aws.ToString(current.ExecutionRoleArn) != cfg.ExecutionRoleARN {
+		return true
+	}
+	if cfg.TaskRoleARN != "" && aws.ToString(current.TaskRoleArn) != cfg.TaskRoleARN {
+		return true
+	}
+	if cfg.CPU != "" && aws.ToString(current.Cpu) != cfg.CPU {
+		return true
+	}
+	if cfg.Memory != "" && aws.ToString(current.Memory) != cfg.Memory {
+		return true
+	}
+	if cfg.CPUArchitecture != "" && string(current.CpuArchitecture) != cfg.CPUArchitecture {
+		return true
+	}
+	if cfg.HealthCheckPath != "" && aws.ToString(current.HealthCheckPath) != cfg.HealthCheckPath {
+		return true
+	}
+	if len(cfg.Subnets) > 0 && (current.NetworkConfiguration == nil || !stringSlicesEqual(current.NetworkConfiguration.Subnets, cfg.Subnets)) {
+		return true
+	}
+	if len(cfg.SecurityGroups) > 0 && (current.NetworkConfiguration == nil || !stringSlicesEqual(current.NetworkConfiguration.SecurityGroups, cfg.SecurityGroups)) {
+		return true
+	}
+	if cfg.MinTaskCount != 0 || cfg.MaxTaskCount != 0 || cfg.ScalingMetric != "" || cfg.ScalingTargetValue != 0 {
+		if current.ScalingTarget == nil {
+			return true
+		}
+		if cfg.MinTaskCount != 0 && aws.ToInt32(current.ScalingTarget.MinTaskCount) != cfg.MinTaskCount {
+			return true
+		}
+		if cfg.MaxTaskCount != 0 && aws.ToInt32(current.ScalingTarget.MaxTaskCount) != cfg.MaxTaskCount {
+			return true
+		}
+		metric := cfg.ScalingMetric
+		if metric == "" {
+			metric = string(types.ExpressGatewayServiceScalingMetricAverageCPUUtilization)
+		}
+		currentMetric := string(current.ScalingTarget.AutoScalingMetric)
+		if currentMetric == "" {
+			currentMetric = string(types.ExpressGatewayServiceScalingMetricAverageCPUUtilization)
+		}
+		if currentMetric != metric {
+			return true
+		}
+		target := cfg.ScalingTargetValue
+		if target == 0 {
+			target = 60
+		}
+		currentTarget := aws.ToInt32(current.ScalingTarget.AutoScalingTargetValue)
+		if currentTarget == 0 {
+			currentTarget = 60
+		}
+		if currentTarget != target {
+			return true
+		}
+	}
+	return false
+}
+
+func expressEnvironmentMap(values []types.KeyValuePair) map[string]string {
+	result := make(map[string]string, len(values))
+	for _, item := range values {
+		result[aws.ToString(item.Name)] = aws.ToString(item.Value)
+	}
+	return result
+}
+
+func expressSecretsMap(values []types.Secret) map[string]string {
+	result := make(map[string]string, len(values))
+	for _, item := range values {
+		result[aws.ToString(item.Name)] = aws.ToString(item.ValueFrom)
+	}
+	return result
 }
 
 func (c *Client) DescribeExpressService(ctx context.Context, arn string) (*types.ECSExpressGatewayService, error) {

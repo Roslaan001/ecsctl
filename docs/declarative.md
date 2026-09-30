@@ -9,7 +9,7 @@
 
 ## The `apply` Command
 
-The `apply` command creates a resource if it doesn't exist, or reconciles its configurations if there are any differences (configuration drift) between your local YAML file and the live AWS resource state.
+The `apply` command creates a resource if it doesn't exist, or reconciles configured fields when they differ from the live AWS resource state. Omitted fields are left unchanged.
 
 ```bash
 ecsctl apply -f <configuration-file>.yaml [flags]
@@ -150,6 +150,10 @@ tags:
 | `tags` | map | Key-value pairs for resource tagging. |
 
 `apply` reconciles the task definition, desired count, configured service settings, and tags. Fields left out of the file are not treated as requests to clear an existing setting. Auto scaling is applied through Application Auto Scaling; the caller needs permission to register scalable targets and scaling policies.
+
+For existing clusters, `apply` reconciles configured capacity providers, the default capacity-provider strategy, Service Connect defaults, and tags. Providers named in a configured default strategy are attached automatically when `capacityProviders` is omitted. If you set `capacityProviders` without a strategy, keep every provider used by the cluster's existing default strategy in the list; apply rejects inconsistent combinations before updating AWS.
+
+ECS does not support changing directly from one launch type to another through `UpdateService`. When `launchType` differs, apply returns an error instead of silently ignoring it; use a supported capacity-provider strategy migration or replace the service.
 
 ### ECS Express Mode Services
 

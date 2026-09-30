@@ -39,7 +39,7 @@ Create and wait for ECS to report the service active:
 ecsctl express create -f express.yaml --wait
 ```
 
-The same YAML can be reconciled with `ecsctl apply -f express.yaml`; apply creates the service when it is missing and updates it when it already exists. `ecsctl express list --cluster production` lists Express services in a cluster.
+The same YAML can be reconciled with `ecsctl apply -f express.yaml`; apply creates the service when it is missing, updates configured fields only when they differ, and leaves unspecified fields alone. Add `--dry-run` to see whether configured fields would change without sending an update. `ecsctl express list --cluster production` lists Express services in a cluster.
 
 For an existing task definition, replace the image/role/CPU/memory fields with `taskDefinitionArn`. Express services require an infrastructure role with permissions for the managed networking, load balancing, and scaling resources. Update a service using `ecsctl express update --service-arn <arn> -f express.yaml`; inspect or delete it with `ecsctl express describe` and `ecsctl express delete`.
 

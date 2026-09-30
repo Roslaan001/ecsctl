@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 // Defining it as an interface allows tests to inject a mock.
 type ecsIface interface {
 	CreateCluster(ctx context.Context, params *ecs.CreateClusterInput, optFns ...func(*ecs.Options)) (*ecs.CreateClusterOutput, error)
+	UpdateCluster(ctx context.Context, params *ecs.UpdateClusterInput, optFns ...func(*ecs.Options)) (*ecs.UpdateClusterOutput, error)
+	PutClusterCapacityProviders(ctx context.Context, params *ecs.PutClusterCapacityProvidersInput, optFns ...func(*ecs.Options)) (*ecs.PutClusterCapacityProvidersOutput, error)
 	DeleteCluster(ctx context.Context, params *ecs.DeleteClusterInput, optFns ...func(*ecs.Options)) (*ecs.DeleteClusterOutput, error)
 	DescribeClusters(ctx context.Context, params *ecs.DescribeClustersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error)
 	ListClusters(ctx context.Context, params *ecs.ListClustersInput, optFns ...func(*ecs.Options)) (*ecs.ListClustersOutput, error)
@@ -177,6 +180,145 @@ func (c *Client) CreateCluster(ctx context.Context, cfg *ecscfg.ClusterConfig) e
 
 	_, err = c.ecs.CreateCluster(ctx, input)
 	return err
+}
+
+// ReconcileCluster applies only cluster fields explicitly configured in YAML.
+func (c *Client) ReconcileCluster(ctx context.Context, cfg *ecscfg.ClusterConfig, dryRun bool) (bool, error) {
+	out, err := c.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{
+		Clusters: []string{cfg.Name},
+		Include:  []types.ClusterField{types.ClusterFieldSettings, types.ClusterFieldTags},
+	})
+	if err != nil {
+		return false, fmt.Errorf("describing cluster: %w", err)
+	}
+	var current *types.Cluster
+	for i := range out.Clusters {
+		if aws.ToString(out.Clusters[i].ClusterName) == cfg.Name && aws.ToString(out.Clusters[i].Status) == "ACTIVE" {
+			current = &out.Clusters[i]
+			break
+		}
+	}
+	if current == nil {
+		return false, fmt.Errorf("cluster %q not found or not ACTIVE", cfg.Name)
+	}
+
+	capacityProvidersConfigured := len(cfg.CapacityProviders) > 0
+	strategyConfigured := len(cfg.DefaultCapacityProviderStrategy) > 0
+	wantProviders := current.CapacityProviders
+	if capacityProvidersConfigured {
+		wantProviders = cfg.CapacityProviders
+	}
+	wantStrategy := current.DefaultCapacityProviderStrategy
+	if strategyConfigured {
+		wantStrategy = toCapacityProviderStrategy(cfg.DefaultCapacityProviderStrategy)
+	}
+	if strategyConfigured && !capacityProvidersConfigured {
+		wantProviders = mergeCapacityProviders(wantProviders, cfg.DefaultCapacityProviderStrategy)
+	}
+	for _, item := range wantStrategy {
+		provider := aws.ToString(item.CapacityProvider)
+		if !containsString(wantProviders, provider) {
+			return false, fmt.Errorf("default capacity provider %q is not included in desired capacityProviders", provider)
+		}
+	}
+	capacityProviderDrift := (capacityProvidersConfigured || strategyConfigured) &&
+		(!stringSlicesEqual(current.CapacityProviders, wantProviders) || !capacityProviderStrategiesEqual(current.DefaultCapacityProviderStrategy, wantStrategy))
+	serviceConnectDrift := cfg.ServiceConnectDefaultsNamespace != "" &&
+		(current.ServiceConnectDefaults == nil || aws.ToString(current.ServiceConnectDefaults.Namespace) != cfg.ServiceConnectDefaultsNamespace)
+	tagsDrift := cfg.Tags != nil && !tagsEqual(current.Tags, cfg.Tags)
+	changed := capacityProviderDrift || serviceConnectDrift || tagsDrift
+	if !changed || dryRun {
+		if dryRun && changed {
+			fmt.Printf("[dry-run] Would reconcile configured fields for cluster %q.\n", cfg.Name)
+		}
+		return changed, nil
+	}
+
+	if capacityProviderDrift {
+		_, err := c.ecs.PutClusterCapacityProviders(ctx, &ecs.PutClusterCapacityProvidersInput{
+			Cluster: aws.String(cfg.Name), CapacityProviders: wantProviders, DefaultCapacityProviderStrategy: wantStrategy,
+		})
+		if err != nil {
+			return false, fmt.Errorf("updating cluster capacity providers: %w", err)
+		}
+	}
+	if serviceConnectDrift {
+		_, err := c.ecs.UpdateCluster(ctx, &ecs.UpdateClusterInput{
+			Cluster:                aws.String(cfg.Name),
+			ServiceConnectDefaults: &types.ClusterServiceConnectDefaultsRequest{Namespace: aws.String(cfg.ServiceConnectDefaultsNamespace)},
+		})
+		if err != nil {
+			return false, fmt.Errorf("updating cluster Service Connect defaults: %w", err)
+		}
+	}
+	if tagsDrift {
+		if err := c.reconcileTags(ctx, aws.ToString(current.ClusterArn), current.Tags, cfg.Tags); err != nil {
+			return false, fmt.Errorf("reconciling cluster tags: %w", err)
+		}
+	}
+	fmt.Printf("✓ Cluster %q updated.\n", cfg.Name)
+	return true, nil
+}
+
+func capacityProvidersFromStrategy(strategy []ecscfg.CapacityProviderStrategyConfig) []string {
+	providers := make([]string, 0, len(strategy))
+	seen := make(map[string]struct{}, len(strategy))
+	for _, item := range strategy {
+		if _, ok := seen[item.CapacityProvider]; ok || item.CapacityProvider == "" {
+			continue
+		}
+		seen[item.CapacityProvider] = struct{}{}
+		providers = append(providers, item.CapacityProvider)
+	}
+	return providers
+}
+
+func mergeCapacityProviders(existing []string, strategy []ecscfg.CapacityProviderStrategyConfig) []string {
+	providers := append([]string(nil), existing...)
+	for _, provider := range capacityProvidersFromStrategy(strategy) {
+		if !containsString(providers, provider) {
+			providers = append(providers, provider)
+		}
+	}
+	return providers
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSlicesEqual(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	leftCopy, rightCopy := append([]string(nil), left...), append([]string(nil), right...)
+	sort.Strings(leftCopy)
+	sort.Strings(rightCopy)
+	return reflect.DeepEqual(leftCopy, rightCopy)
+}
+
+func capacityProviderStrategiesEqual(left, right []types.CapacityProviderStrategyItem) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	key := func(item types.CapacityProviderStrategyItem) string {
+		return fmt.Sprintf("%s:%d:%d", aws.ToString(item.CapacityProvider), item.Weight, item.Base)
+	}
+	leftKeys, rightKeys := make([]string, 0, len(left)), make([]string, 0, len(right))
+	for _, item := range left {
+		leftKeys = append(leftKeys, key(item))
+	}
+	for _, item := range right {
+		rightKeys = append(rightKeys, key(item))
+	}
+	sort.Strings(leftKeys)
+	sort.Strings(rightKeys)
+	return reflect.DeepEqual(leftKeys, rightKeys)
 }
 
 // DeleteCluster deletes an ECS cluster by name.
@@ -1049,6 +1191,13 @@ func (c *Client) ReconcileService(ctx context.Context, cfg *ecscfg.ServiceConfig
 	}
 	if currentScheduling != desiredScheduling {
 		return false, fmt.Errorf("service schedulingStrategy cannot be changed from %s to %s; replace the service", currentScheduling, desiredScheduling)
+	}
+	desiredLaunchType := cfg.LaunchType
+	if desiredLaunchType == "" {
+		desiredLaunchType = "FARGATE"
+	}
+	if len(cfg.CapacityProviderStrategy) == 0 && string(svc.LaunchType) != desiredLaunchType {
+		return false, fmt.Errorf("service launchType cannot be changed from %q to %q in place; replace the service or configure capacityProviderStrategy", svc.LaunchType, desiredLaunchType)
 	}
 
 	if desiredScheduling == "REPLICA" && cfg.AutoScaling == nil && svc.DesiredCount != cfg.DesiredCount {

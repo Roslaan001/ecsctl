@@ -65,13 +65,17 @@ func applyCluster(client *aws.Client, file string) error {
 	}
 
 	if exists {
-		fmt.Printf("~ Cluster %q already exists — nothing to change.\n", cfg.Name)
+		changed, err := client.ReconcileCluster(context.Background(), cfg, applyDryRun)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			fmt.Printf("  Cluster %q is up to date.\n", cfg.Name)
+		}
 		if !applyDryRun {
 			if err := writeClusterState(cfg, resolvedRegion); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: state not updated: %v\n", err)
 			}
-		} else {
-			fmt.Printf("[dry-run] Would ensure cluster %q is tracked in state.\n", cfg.Name)
 		}
 		return nil
 	}
@@ -168,13 +172,15 @@ func applyExpressService(client *aws.Client, file string) error {
 		}
 	}
 	if existingARN != "" {
-		fmt.Printf("~ Express service %q exists; applying configured changes.\n", cfg.ServiceName)
-		if applyDryRun {
-			fmt.Printf("[dry-run] Would reconcile configured fields for Express service %q.\n", cfg.ServiceName)
-			return nil
-		}
-		if err := client.UpdateExpressService(context.Background(), existingARN, cfg); err != nil {
+		changed, err := client.ReconcileExpressService(context.Background(), existingARN, cfg, applyDryRun)
+		if err != nil {
 			return err
+		}
+		if !changed {
+			fmt.Printf("  Express service %q is up to date.\n", cfg.ServiceName)
+		}
+		if applyDryRun {
+			return nil
 		}
 		if err := writeExpressState(cfg, existingARN, region); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Express service updated but state not updated: %v\n", err)

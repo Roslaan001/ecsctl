@@ -103,6 +103,68 @@ func TestCreateExpressServiceTaskDefinitionMode(t *testing.T) {
 	}
 }
 
+func TestReconcileExpressServiceNoDriftDoesNotUpdate(t *testing.T) {
+	service := &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), ServiceArn: awssdk.String("service-arn"),
+		InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{
+			ServiceRevisionArn: awssdk.String("revision-1"), ExecutionRoleArn: awssdk.String("execution-role"), TaskRoleArn: awssdk.String("task-role"),
+			Cpu: awssdk.String("512"), Memory: awssdk.String("1024"), CpuArchitecture: types.ExpressCpuArchitectureArm64,
+			HealthCheckPath: awssdk.String("/health"),
+			PrimaryContainer: &types.ExpressGatewayContainer{
+				Image: awssdk.String("example/api:v1"), ContainerPort: awssdk.Int32(8080), Command: []string{"./serve"},
+				Environment: []types.KeyValuePair{{Name: awssdk.String("MODE"), Value: awssdk.String("prod")}},
+			},
+			NetworkConfiguration: &types.ExpressGatewayServiceNetworkConfiguration{Subnets: []string{"subnet-a"}, SecurityGroups: []string{"sg-a"}},
+			ScalingTarget:        &types.ExpressGatewayScalingTarget{MinTaskCount: awssdk.Int32(1), MaxTaskCount: awssdk.Int32(5), AutoScalingMetric: types.ExpressGatewayServiceScalingMetricAverageCPUUtilization, AutoScalingTargetValue: awssdk.Int32(60)},
+		}},
+	}
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: service}}
+	cfg := &ecscfg.ExpressServiceConfig{
+		ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", ExecutionRoleARN: "execution-role", TaskRoleARN: "task-role",
+		Image: "example/api:v1", ContainerPort: 8080, Command: []string{"./serve"}, Environment: map[string]string{"MODE": "prod"},
+		CPU: "512", Memory: "1024", CPUArchitecture: "ARM64", HealthCheckPath: "/health", Subnets: []string{"subnet-a"},
+		SecurityGroups: []string{"sg-a"}, MinTaskCount: 1, MaxTaskCount: 5, ScalingMetric: "AVERAGE_CPU", ScalingTargetValue: 60,
+	}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, false)
+	if err != nil || changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (false, nil)", changed, err)
+	}
+	if mock.updateExpressInput != nil {
+		t.Fatal("matching Express configuration should not trigger an update")
+	}
+}
+
+func TestReconcileExpressServiceDryRunReportsDriftWithoutUpdating(t *testing.T) {
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{ServiceRevisionArn: awssdk.String("revision-1"), PrimaryContainer: &types.ExpressGatewayContainer{Image: awssdk.String("example/api:v1")}}},
+	}}}
+	cfg := &ecscfg.ExpressServiceConfig{ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", Image: "example/api:v2"}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, true)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (true, nil)", changed, err)
+	}
+	if mock.updateExpressInput != nil {
+		t.Fatal("dry-run must not send an Express update")
+	}
+}
+
+func TestReconcileExpressServiceUpdatesOnlyWhenConfiguredFieldsDrift(t *testing.T) {
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{ServiceRevisionArn: awssdk.String("revision-1"), PrimaryContainer: &types.ExpressGatewayContainer{Image: awssdk.String("example/api:v1")}}},
+	}}}
+	cfg := &ecscfg.ExpressServiceConfig{ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", Image: "example/api:v2"}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, false)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (true, nil)", changed, err)
+	}
+	if mock.updateExpressInput == nil || awssdk.ToString(mock.updateExpressInput.PrimaryContainer.Image) != cfg.Image {
+		t.Fatalf("expected update to desired container image, got %#v", mock.updateExpressInput)
+	}
+}
+
 func TestCreateExpressServiceErrors(t *testing.T) {
 	t.Run("API error", func(t *testing.T) {
 		wantErr := errors.New("create failed")

@@ -3,6 +3,8 @@ package aws
 import (
 	"context"
 	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,6 +23,10 @@ type mockECS struct {
 	createClusterCalled bool
 	createClusterErr    error
 	createClusterInput  *ecs.CreateClusterInput
+	updateClusterInput  *ecs.UpdateClusterInput
+	updateClusterErr    error
+	putClusterProviders *ecs.PutClusterCapacityProvidersInput
+	putClusterErr       error
 	describeServicesOut *ecs.DescribeServicesOutput
 	describeServicesErr error
 	listServicesIn      *ecs.ListServicesInput
@@ -60,6 +66,14 @@ func (m *mockECS) CreateCluster(_ context.Context, input *ecs.CreateClusterInput
 	m.createClusterCalled = true
 	m.createClusterInput = input
 	return &ecs.CreateClusterOutput{}, m.createClusterErr
+}
+func (m *mockECS) UpdateCluster(_ context.Context, input *ecs.UpdateClusterInput, _ ...func(*ecs.Options)) (*ecs.UpdateClusterOutput, error) {
+	m.updateClusterInput = input
+	return &ecs.UpdateClusterOutput{}, m.updateClusterErr
+}
+func (m *mockECS) PutClusterCapacityProviders(_ context.Context, input *ecs.PutClusterCapacityProvidersInput, _ ...func(*ecs.Options)) (*ecs.PutClusterCapacityProvidersOutput, error) {
+	m.putClusterProviders = input
+	return &ecs.PutClusterCapacityProvidersOutput{}, m.putClusterErr
 }
 func (m *mockECS) DescribeServices(_ context.Context, _ *ecs.DescribeServicesInput, _ ...func(*ecs.Options)) (*ecs.DescribeServicesOutput, error) {
 	return m.describeServicesOut, m.describeServicesErr
@@ -182,6 +196,83 @@ func TestCreateCluster_DoesNotExist(t *testing.T) {
 	}
 }
 
+func TestReconcileClusterNoDriftDoesNotUpdate(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeClustersOut: &ecs.DescribeClustersOutput{Clusters: []types.Cluster{{
+		ClusterName: aws.String("prod"), Status: &active, CapacityProviders: []string{"FARGATE"},
+		DefaultCapacityProviderStrategy: []types.CapacityProviderStrategyItem{{CapacityProvider: aws.String("FARGATE"), Weight: 1}},
+		ServiceConnectDefaults:          &types.ClusterServiceConnectDefaults{Namespace: aws.String("prod.local")},
+		Tags:                            []types.Tag{{Key: aws.String("env"), Value: aws.String("prod")}},
+	}}}}
+	cfg := &ecscfg.ClusterConfig{Name: "prod", CapacityProviders: []string{"FARGATE"}, DefaultCapacityProviderStrategy: []ecscfg.CapacityProviderStrategyConfig{{CapacityProvider: "FARGATE", Weight: 1}}, ServiceConnectDefaultsNamespace: "prod.local", Tags: map[string]string{"env": "prod"}}
+	changed, err := testClient(mock).ReconcileCluster(context.Background(), cfg, false)
+	if err != nil || changed {
+		t.Fatalf("ReconcileCluster() = (%v, %v), want (false, nil)", changed, err)
+	}
+	if mock.putClusterProviders != nil || mock.updateClusterInput != nil {
+		t.Fatal("matching cluster configuration should not trigger updates")
+	}
+}
+
+func TestReconcileClusterUpdatesConfiguredFields(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeClustersOut: &ecs.DescribeClustersOutput{Clusters: []types.Cluster{{ClusterName: aws.String("prod"), Status: &active, CapacityProviders: []string{"FARGATE"}, ClusterArn: aws.String("cluster-arn")}}}}
+	cfg := &ecscfg.ClusterConfig{Name: "prod", CapacityProviders: []string{"FARGATE", "FARGATE_SPOT"}, ServiceConnectDefaultsNamespace: "prod.local"}
+	changed, err := testClient(mock).ReconcileCluster(context.Background(), cfg, false)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileCluster() = (%v, %v), want (true, nil)", changed, err)
+	}
+	if mock.putClusterProviders == nil || !reflect.DeepEqual(mock.putClusterProviders.CapacityProviders, cfg.CapacityProviders) {
+		t.Fatalf("capacity providers not updated: %#v", mock.putClusterProviders)
+	}
+	if mock.updateClusterInput == nil || aws.ToString(mock.updateClusterInput.ServiceConnectDefaults.Namespace) != "prod.local" {
+		t.Fatalf("Service Connect defaults not updated: %#v", mock.updateClusterInput)
+	}
+}
+
+func TestReconcileClusterAddsProvidersReferencedByConfiguredStrategy(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeClustersOut: &ecs.DescribeClustersOutput{Clusters: []types.Cluster{{
+		ClusterName: aws.String("prod"), Status: &active, CapacityProviders: []string{"FARGATE"},
+	}}}}
+	cfg := &ecscfg.ClusterConfig{Name: "prod", DefaultCapacityProviderStrategy: []ecscfg.CapacityProviderStrategyConfig{{CapacityProvider: "FARGATE_SPOT", Weight: 1}}}
+	changed, err := testClient(mock).ReconcileCluster(context.Background(), cfg, false)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileCluster() = (%v, %v), want (true, nil)", changed, err)
+	}
+	want := []string{"FARGATE", "FARGATE_SPOT"}
+	if mock.putClusterProviders == nil || !reflect.DeepEqual(mock.putClusterProviders.CapacityProviders, want) {
+		t.Fatalf("capacity providers = %#v, want %v", mock.putClusterProviders, want)
+	}
+}
+
+func TestReconcileClusterRejectsStrategyProviderMissingFromExplicitProviderList(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeClustersOut: &ecs.DescribeClustersOutput{Clusters: []types.Cluster{{ClusterName: aws.String("prod"), Status: &active}}}}
+	cfg := &ecscfg.ClusterConfig{Name: "prod", CapacityProviders: []string{"FARGATE"}, DefaultCapacityProviderStrategy: []ecscfg.CapacityProviderStrategyConfig{{CapacityProvider: "FARGATE_SPOT", Weight: 1}}}
+	if _, err := testClient(mock).ReconcileCluster(context.Background(), cfg, false); err == nil || !strings.Contains(err.Error(), "not included in desired capacityProviders") {
+		t.Fatalf("error = %v, want strategy/provider validation error", err)
+	}
+	if mock.putClusterProviders != nil {
+		t.Fatal("invalid config should not send a cluster update")
+	}
+}
+
+func TestReconcileClusterRejectsRemovingProviderUsedByPreservedStrategy(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeClustersOut: &ecs.DescribeClustersOutput{Clusters: []types.Cluster{{
+		ClusterName: aws.String("prod"), Status: &active, CapacityProviders: []string{"FARGATE", "FARGATE_SPOT"},
+		DefaultCapacityProviderStrategy: []types.CapacityProviderStrategyItem{{CapacityProvider: aws.String("FARGATE_SPOT"), Weight: 1}},
+	}}}}
+	cfg := &ecscfg.ClusterConfig{Name: "prod", CapacityProviders: []string{"FARGATE"}}
+	if _, err := testClient(mock).ReconcileCluster(context.Background(), cfg, false); err == nil || !strings.Contains(err.Error(), "not included in desired capacityProviders") {
+		t.Fatalf("error = %v, want inconsistent preserved strategy error", err)
+	}
+	if mock.putClusterProviders != nil {
+		t.Fatal("inconsistent provider update must not be sent")
+	}
+}
+
 func TestCreateCluster_DescribeError(t *testing.T) {
 	mock := &mockECS{describeClustersErr: errors.New("network error")}
 	if err := testClient(mock).CreateCluster(context.Background(), &ecscfg.ClusterConfig{Name: "any"}); err == nil {
@@ -295,8 +386,8 @@ func TestReconcileServiceDoesNotRepeatServiceConnectOrAutoscaling(t *testing.T) 
 	wantServiceConnect := toServiceConnect(&ecscfg.ServiceConnectConfig{Enabled: true, Namespace: "prod.local", Services: []ecscfg.ServiceConnectServiceConfig{{PortName: "http", DiscoveryName: "api"}}})
 	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{
 		ServiceName: aws.String("api"), TaskDefinition: aws.String("api:1"), Status: aws.String("ACTIVE"), DesiredCount: 1,
-		SchedulingStrategy: types.SchedulingStrategyReplica,
-		Deployments:        []types.Deployment{{Status: aws.String("PRIMARY"), ServiceConnectConfiguration: wantServiceConnect}},
+		SchedulingStrategy: types.SchedulingStrategyReplica, LaunchType: types.LaunchTypeFargate,
+		Deployments: []types.Deployment{{Status: aws.String("PRIMARY"), ServiceConnectConfiguration: wantServiceConnect}},
 	}}}}
 	autoScaling := &mockApplicationAutoScaling{
 		targetsOut: &applicationautoscaling.DescribeScalableTargetsOutput{ScalableTargets: []applicationautoscalingTypes.ScalableTarget{{MinCapacity: aws.Int32(1), MaxCapacity: aws.Int32(5)}}},
@@ -321,7 +412,7 @@ func TestReconcileServiceDoesNotRepeatServiceConnectOrAutoscaling(t *testing.T) 
 
 func TestReconcileServiceAvoidsRevisionARNFalseDrift(t *testing.T) {
 	active := "ACTIVE"
-	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{ServiceName: aws.String("api"), Status: &active, TaskDefinition: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api:4"), DesiredCount: 1}}}}
+	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{ServiceName: aws.String("api"), Status: &active, TaskDefinition: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api:4"), DesiredCount: 1, LaunchType: types.LaunchTypeFargate}}}}
 	changed, err := testClient(mock).ReconcileService(context.Background(), &ecscfg.ServiceConfig{Name: "api", Cluster: "prod", TaskDefinition: "api:4", DesiredCount: 1, LaunchType: "FARGATE"}, false)
 	if err != nil {
 		t.Fatal(err)
@@ -331,6 +422,21 @@ func TestReconcileServiceAvoidsRevisionARNFalseDrift(t *testing.T) {
 	}
 	if mock.updateServiceInput != nil {
 		t.Fatal("no update should be sent when the service matches")
+	}
+}
+
+func TestReconcileServiceReportsImmutableLaunchTypeDrift(t *testing.T) {
+	active := "ACTIVE"
+	mock := &mockECS{describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{
+		ServiceName: aws.String("api"), Status: &active, TaskDefinition: aws.String("api:4"), DesiredCount: 1,
+		LaunchType: types.LaunchTypeFargate, SchedulingStrategy: types.SchedulingStrategyReplica,
+	}}}}
+	_, err := testClient(mock).ReconcileService(context.Background(), &ecscfg.ServiceConfig{Name: "api", Cluster: "prod", TaskDefinition: "api:4", DesiredCount: 1, LaunchType: "EC2"}, false)
+	if err == nil || !strings.Contains(err.Error(), "launchType cannot be changed") {
+		t.Fatalf("error = %v, want immutable launchType drift error", err)
+	}
+	if mock.updateServiceInput != nil {
+		t.Fatal("immutable launchType drift must not send an update")
 	}
 }
 
