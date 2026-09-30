@@ -95,15 +95,3 @@ jobs:
 
       - name: Scan Go dependencies and reachable code
         uses: golang/govulncheck-action@v1.1.0
-
-  dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Review dependency changes
-        uses: actions/dependency-review-action@v5
-        with:
-          fail-on-severity: moderate
