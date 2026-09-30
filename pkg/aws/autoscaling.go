@@ -15,6 +15,15 @@ func (c *Client) configureServiceAutoScaling(ctx context.Context, cfg *ecscfg.Se
 	if c.autoscaling == nil {
 		return fmt.Errorf("application auto scaling client is unavailable")
 	}
+	metric := strings.ToLower(strings.ReplaceAll(cfg.AutoScaling.Metric, "_", ""))
+	metricType := types.MetricTypeECSServiceAverageCPUUtilization
+	switch metric {
+	case "", "cpu", "cpuutilization", "ecsserviceaveragecpuutilization":
+	case "memory", "memoryutilization", "ecsserviceaveragememoryutilization":
+		metricType = types.MetricTypeECSServiceAverageMemoryUtilization
+	default:
+		return fmt.Errorf("unsupported autoScaling.metric %q; use CPU or Memory", cfg.AutoScaling.Metric)
+	}
 	resourceID := fmt.Sprintf("service/%s/%s", cfg.Cluster, cfg.Name)
 	_, err := c.autoscaling.RegisterScalableTarget(ctx, &applicationautoscaling.RegisterScalableTargetInput{
 		ServiceNamespace:  types.ServiceNamespaceEcs,
@@ -25,15 +34,6 @@ func (c *Client) configureServiceAutoScaling(ctx context.Context, cfg *ecscfg.Se
 	})
 	if err != nil {
 		return fmt.Errorf("registering scalable target: %w", err)
-	}
-	metric := strings.ToLower(strings.ReplaceAll(cfg.AutoScaling.Metric, "_", ""))
-	metricType := types.MetricTypeECSServiceAverageCPUUtilization
-	switch metric {
-	case "", "cpu", "cpuutilization", "ecsserviceaveragecpuutilization":
-	case "memory", "memoryutilization", "ecsserviceaveragememoryutilization":
-		metricType = types.MetricTypeECSServiceAverageMemoryUtilization
-	default:
-		return fmt.Errorf("unsupported autoScaling.metric %q; use CPU or Memory", cfg.AutoScaling.Metric)
 	}
 	target := cfg.AutoScaling.TargetValue
 	if target == 0 {

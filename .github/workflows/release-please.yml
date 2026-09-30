@@ -15,18 +15,39 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - name: Require a token that triggers CI on the release PR
-        env:
-          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: |
-          if [ -z "$RELEASE_PLEASE_TOKEN" ]; then
-            echo "::error::Add a fine-grained token as the RELEASE_PLEASE_TOKEN repository secret. It needs contents, issues, and pull requests read/write access so Release Please can open PRs and trigger CI."
-            exit 1
-          fi
-
       - name: Create or update release PR
+        id: release
         uses: googleapis/release-please-action@v5
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # A release created with GITHUB_TOKEN does not trigger the tag-push
+      # workflow. Run its validation and packaging here instead.
+      - name: Check out release tag
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        if: ${{ steps.release.outputs.release_created }}
+        run: go test ./... -race -count=1
+
+      - name: Build release artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        uses: goreleaser/goreleaser-action@v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.18.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

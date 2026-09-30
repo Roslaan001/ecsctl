@@ -45,11 +45,16 @@ type ecsIface interface {
 	UntagResource(ctx context.Context, params *ecs.UntagResourceInput, optFns ...func(*ecs.Options)) (*ecs.UntagResourceOutput, error)
 }
 
+type applicationAutoScalingIface interface {
+	RegisterScalableTarget(ctx context.Context, params *applicationautoscaling.RegisterScalableTargetInput, optFns ...func(*applicationautoscaling.Options)) (*applicationautoscaling.RegisterScalableTargetOutput, error)
+	PutScalingPolicy(ctx context.Context, params *applicationautoscaling.PutScalingPolicyInput, optFns ...func(*applicationautoscaling.Options)) (*applicationautoscaling.PutScalingPolicyOutput, error)
+}
+
 // Client wraps the AWS ECS and CloudWatch Logs SDK clients.
 type Client struct {
 	ecs         ecsIface
 	logs        *cloudwatchlogs.Client
-	autoscaling *applicationautoscaling.Client
+	autoscaling applicationAutoScalingIface
 }
 
 // LogsOptions holds options for fetching logs.

@@ -25,9 +25,28 @@ type mockECS struct {
 	createServiceErr    error
 	createServiceInput  *ecs.CreateServiceInput
 	updateServiceInput  *ecs.UpdateServiceInput
+	updateServiceErr    error
+	deleteServiceInput  *ecs.DeleteServiceInput
+	deleteServiceErr    error
+	deleteServiceCalled bool
+	runTaskInput        *ecs.RunTaskInput
+	runTaskOut          *ecs.RunTaskOutput
+	runTaskErr          error
+	stopTaskInput       *ecs.StopTaskInput
+	stopTaskErr         error
 	describeTaskDefOut  *ecs.DescribeTaskDefinitionOutput
 	registerTaskDefIn   *ecs.RegisterTaskDefinitionInput
 	registerTaskDefOut  *ecs.RegisterTaskDefinitionOutput
+	createExpressInput  *ecs.CreateExpressGatewayServiceInput
+	createExpressOut    *ecs.CreateExpressGatewayServiceOutput
+	createExpressErr    error
+	updateExpressInput  *ecs.UpdateExpressGatewayServiceInput
+	updateExpressErr    error
+	describeExpressIn   *ecs.DescribeExpressGatewayServiceInput
+	describeExpressOut  *ecs.DescribeExpressGatewayServiceOutput
+	describeExpressErr  error
+	deleteExpressInput  *ecs.DeleteExpressGatewayServiceInput
+	deleteExpressErr    error
 }
 
 func (m *mockECS) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
@@ -49,8 +68,10 @@ func (m *mockECS) CreateService(_ context.Context, input *ecs.CreateServiceInput
 func (m *mockECS) DeleteCluster(_ context.Context, _ *ecs.DeleteClusterInput, _ ...func(*ecs.Options)) (*ecs.DeleteClusterOutput, error) {
 	panic("unexpected: DeleteCluster")
 }
-func (m *mockECS) DeleteService(_ context.Context, _ *ecs.DeleteServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteServiceOutput, error) {
-	panic("unexpected: DeleteService")
+func (m *mockECS) DeleteService(_ context.Context, input *ecs.DeleteServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteServiceOutput, error) {
+	m.deleteServiceCalled = true
+	m.deleteServiceInput = input
+	return &ecs.DeleteServiceOutput{}, m.deleteServiceErr
 }
 func (m *mockECS) ListClusters(_ context.Context, _ *ecs.ListClustersInput, _ ...func(*ecs.Options)) (*ecs.ListClustersOutput, error) {
 	panic("unexpected: ListClusters")
@@ -60,7 +81,7 @@ func (m *mockECS) ListServices(_ context.Context, _ *ecs.ListServicesInput, _ ..
 }
 func (m *mockECS) UpdateService(_ context.Context, input *ecs.UpdateServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateServiceOutput, error) {
 	m.updateServiceInput = input
-	return &ecs.UpdateServiceOutput{}, nil
+	return &ecs.UpdateServiceOutput{}, m.updateServiceErr
 }
 func (m *mockECS) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	return m.describeTaskDefOut, nil
@@ -78,23 +99,38 @@ func (m *mockECS) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(
 func (m *mockECS) ExecuteCommand(_ context.Context, _ *ecs.ExecuteCommandInput, _ ...func(*ecs.Options)) (*ecs.ExecuteCommandOutput, error) {
 	panic("unexpected: ExecuteCommand")
 }
-func (m *mockECS) CreateExpressGatewayService(_ context.Context, _ *ecs.CreateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.CreateExpressGatewayServiceOutput, error) {
-	panic("unexpected: CreateExpressGatewayService")
+func (m *mockECS) CreateExpressGatewayService(_ context.Context, input *ecs.CreateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.CreateExpressGatewayServiceOutput, error) {
+	m.createExpressInput = input
+	if m.createExpressOut == nil {
+		m.createExpressOut = &ecs.CreateExpressGatewayServiceOutput{}
+	}
+	return m.createExpressOut, m.createExpressErr
 }
-func (m *mockECS) UpdateExpressGatewayService(_ context.Context, _ *ecs.UpdateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateExpressGatewayServiceOutput, error) {
-	panic("unexpected: UpdateExpressGatewayService")
+func (m *mockECS) UpdateExpressGatewayService(_ context.Context, input *ecs.UpdateExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.UpdateExpressGatewayServiceOutput, error) {
+	m.updateExpressInput = input
+	return &ecs.UpdateExpressGatewayServiceOutput{}, m.updateExpressErr
 }
-func (m *mockECS) DescribeExpressGatewayService(_ context.Context, _ *ecs.DescribeExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DescribeExpressGatewayServiceOutput, error) {
-	panic("unexpected: DescribeExpressGatewayService")
+func (m *mockECS) DescribeExpressGatewayService(_ context.Context, input *ecs.DescribeExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DescribeExpressGatewayServiceOutput, error) {
+	m.describeExpressIn = input
+	if m.describeExpressOut == nil {
+		m.describeExpressOut = &ecs.DescribeExpressGatewayServiceOutput{}
+	}
+	return m.describeExpressOut, m.describeExpressErr
 }
-func (m *mockECS) DeleteExpressGatewayService(_ context.Context, _ *ecs.DeleteExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteExpressGatewayServiceOutput, error) {
-	panic("unexpected: DeleteExpressGatewayService")
+func (m *mockECS) DeleteExpressGatewayService(_ context.Context, input *ecs.DeleteExpressGatewayServiceInput, _ ...func(*ecs.Options)) (*ecs.DeleteExpressGatewayServiceOutput, error) {
+	m.deleteExpressInput = input
+	return &ecs.DeleteExpressGatewayServiceOutput{}, m.deleteExpressErr
 }
-func (m *mockECS) RunTask(_ context.Context, _ *ecs.RunTaskInput, _ ...func(*ecs.Options)) (*ecs.RunTaskOutput, error) {
-	panic("unexpected: RunTask")
+func (m *mockECS) RunTask(_ context.Context, input *ecs.RunTaskInput, _ ...func(*ecs.Options)) (*ecs.RunTaskOutput, error) {
+	m.runTaskInput = input
+	if m.runTaskOut == nil {
+		m.runTaskOut = &ecs.RunTaskOutput{}
+	}
+	return m.runTaskOut, m.runTaskErr
 }
-func (m *mockECS) StopTask(_ context.Context, _ *ecs.StopTaskInput, _ ...func(*ecs.Options)) (*ecs.StopTaskOutput, error) {
-	panic("unexpected: StopTask")
+func (m *mockECS) StopTask(_ context.Context, input *ecs.StopTaskInput, _ ...func(*ecs.Options)) (*ecs.StopTaskOutput, error) {
+	m.stopTaskInput = input
+	return &ecs.StopTaskOutput{}, m.stopTaskErr
 }
 func (m *mockECS) TagResource(_ context.Context, _ *ecs.TagResourceInput, _ ...func(*ecs.Options)) (*ecs.TagResourceOutput, error) {
 	panic("unexpected: TagResource")
