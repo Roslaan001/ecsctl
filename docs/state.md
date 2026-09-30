@@ -58,15 +58,28 @@ ecsctl state import cluster my-existing-cluster --region us-east-1
 
 # Import an existing service into current active context
 ecsctl state import service my-existing-service --cluster my-existing-cluster --region us-east-1
+
+# Import an existing Express service by name or ARN
+ecsctl state import express my-api --cluster my-existing-cluster --region us-east-1
 ```
 
 Once imported, `ecsctl` will begin tracking these resources, and you can manage them using `ecsctl apply` and describe/list commands.
+
+Import captures the observed cluster, service, or Express configuration in remote state. Print it with `state config` to create a YAML file to review and manage declaratively:
+
+```bash
+ecsctl state config cluster my-existing-cluster
+ecsctl state config service my-existing-service --cluster my-existing-cluster
+ecsctl state config express my-api --cluster my-existing-cluster
+```
+
+The configuration may contain environment values returned by ECS. Review it before storing it in source control and keep secrets in Secrets Manager.
 
 ---
 
 ## 4. Show Active State (`state show`)
 
-Print detailed information about the active context, including the S3 bucket configuration path and all tracked clusters and services under management:
+Print detailed information about the active context, including the S3 bucket configuration path and tracked clusters, services, and Express services:
 
 ```bash
 ecsctl state show

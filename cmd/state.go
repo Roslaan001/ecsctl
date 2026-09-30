@@ -186,7 +186,8 @@ var stateImportCmd = &cobra.Command{
 	Short: "Import an existing AWS resource into ecsctl state",
 	Args:  cobra.ExactArgs(2),
 	Example: `  ecsctl state import cluster my-cluster --region eu-west-2
-  ecsctl state import service my-service --cluster my-cluster --region eu-west-2`,
+  ecsctl state import service my-service --cluster my-cluster --region eu-west-2
+  ecsctl state import express my-api --cluster my-cluster --region eu-west-2`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceType := args[0]
 		resourceName := args[1]
@@ -237,8 +238,29 @@ var stateImportCmd = &cobra.Command{
 			}
 			res = *r
 
+		case "express", "express-service":
+			services, err := ecsClient.ListExpressServices(ctx, stateImportCluster)
+			if err != nil {
+				return err
+			}
+			var arn string
+			for _, service := range services {
+				if aws.ToString(service.ServiceName) == resourceName || aws.ToString(service.ServiceArn) == resourceName {
+					arn = aws.ToString(service.ServiceArn)
+					break
+				}
+			}
+			if arn == "" {
+				return fmt.Errorf("express service %q not found", resourceName)
+			}
+			r, err := ecsClient.DescribeExpressServiceResource(ctx, arn)
+			if err != nil {
+				return err
+			}
+			res = *r
+
 		default:
-			return fmt.Errorf("unknown resource type %q — supported: cluster, service", resourceType)
+			return fmt.Errorf("unknown resource type %q — supported: cluster, service, express", resourceType)
 		}
 
 		// Load state, add resource, save
@@ -331,11 +353,67 @@ var stateShowCmd = &cobra.Command{
 			}
 		}
 
+		expressServices := st.FindExpressServices("")
+		if len(expressServices) > 0 {
+			fmt.Printf("EXPRESS SERVICES (%d)\n", len(expressServices))
+			fmt.Printf("  %-30s %-20s %-12s %-14s %s\n", "NAME", "CLUSTER", "REGION", "CONFIG", "ARN")
+			for _, resource := range expressServices {
+				configStatus := "not captured"
+				if resource.Configuration != "" {
+					configStatus = "captured"
+				}
+				fmt.Printf("  %-30s %-20s %-12s %-14s %s\n", resource.Name, resource.Cluster, resource.Region, configStatus, resource.ARN)
+			}
+		}
+
 		if len(st.Resources) == 0 {
 			fmt.Println("No resources tracked. Use 'ecsctl state import' to add existing resources.")
 		}
 
 		return nil
+	},
+}
+
+var (
+	stateConfigCluster string
+)
+
+var stateConfigCmd = &cobra.Command{
+	Use:   "config [cluster|service|express] [name]",
+	Short: "Print the saved configuration for a tracked resource",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		localCfg, err := localconfig.Load()
+		if err != nil {
+			return fmt.Errorf("loading local config: %w", err)
+		}
+		_, activeCtx, err := localCfg.GetActiveContext(stateContext)
+		if err != nil {
+			return err
+		}
+		backend, err := state.NewBackend(context.Background(), activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)
+		if err != nil {
+			return err
+		}
+		st, err := backend.Load(context.Background())
+		if err != nil {
+			return err
+		}
+		resourceType := state.ResourceType(args[0])
+		if resourceType == "express" {
+			resourceType = state.ResourceTypeExpressService
+		}
+		for _, resource := range st.Resources {
+			if resource.Type != resourceType || resource.Name != args[1] || (stateConfigCluster != "" && resource.Cluster != stateConfigCluster) {
+				continue
+			}
+			if resource.Configuration == "" {
+				return fmt.Errorf("configuration was not captured for imported %s %q", args[0], args[1])
+			}
+			fmt.Print(resource.Configuration)
+			return nil
+		}
+		return fmt.Errorf("%s %q was not found in the active state", args[0], args[1])
 	},
 }
 
@@ -359,4 +437,6 @@ func init() {
 	stateCmd.AddCommand(stateListContextsCmd)
 	stateCmd.AddCommand(stateImportCmd)
 	stateCmd.AddCommand(stateShowCmd)
+	stateConfigCmd.Flags().StringVar(&stateConfigCluster, "cluster", "", "Cluster name when selecting a service")
+	stateCmd.AddCommand(stateConfigCmd)
 }

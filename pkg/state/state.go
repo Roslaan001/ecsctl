@@ -31,20 +31,22 @@ import (
 type ResourceType string
 
 const (
-	ResourceTypeCluster ResourceType = "cluster"
-	ResourceTypeService ResourceType = "service"
+	ResourceTypeCluster        ResourceType = "cluster"
+	ResourceTypeService        ResourceType = "service"
+	ResourceTypeExpressService ResourceType = "express-service"
 )
 
 // Resource is a single ECS resource tracked in state.
 type Resource struct {
-	Type      ResourceType      `json:"type"`
-	Name      string            `json:"name"`
-	ARN       string            `json:"arn"`
-	Region    string            `json:"region"`
-	Cluster   string            `json:"cluster,omitempty"` // services only
-	CreatedBy string            `json:"createdBy"`
-	CreatedAt time.Time         `json:"createdAt"`
-	Tags      map[string]string `json:"tags,omitempty"`
+	Type          ResourceType      `json:"type"`
+	Name          string            `json:"name"`
+	ARN           string            `json:"arn"`
+	Region        string            `json:"region"`
+	Cluster       string            `json:"cluster,omitempty"` // services only
+	CreatedBy     string            `json:"createdBy"`
+	CreatedAt     time.Time         `json:"createdAt"`
+	Tags          map[string]string `json:"tags,omitempty"`
+	Configuration string            `json:"configuration,omitempty"`
 }
 
 // State is the top-level state document stored in S3.
@@ -241,6 +243,18 @@ func (st *State) RemoveResource(resourceType ResourceType, name, cluster string)
 	st.Resources = filtered
 }
 
+// RemoveResourceByARN removes a resource by its globally unique ARN.
+func (st *State) RemoveResourceByARN(arn string) {
+	filtered := st.Resources[:0]
+	for _, resource := range st.Resources {
+		if resource.ARN == arn {
+			continue
+		}
+		filtered = append(filtered, resource)
+	}
+	st.Resources = filtered
+}
+
 // RemoveClusterAndServices removes the cluster itself and any services deployed to it from the state.
 func (st *State) RemoveClusterAndServices(clusterName string) {
 	filtered := st.Resources[:0]
@@ -248,12 +262,23 @@ func (st *State) RemoveClusterAndServices(clusterName string) {
 		if r.Type == ResourceTypeCluster && r.Name == clusterName {
 			continue
 		}
-		if r.Type == ResourceTypeService && r.Cluster == clusterName {
+		if (r.Type == ResourceTypeService || r.Type == ResourceTypeExpressService) && r.Cluster == clusterName {
 			continue
 		}
 		filtered = append(filtered, r)
 	}
 	st.Resources = filtered
+}
+
+// FindExpressServices returns tracked Express services, optionally filtered by cluster.
+func (st *State) FindExpressServices(cluster string) []Resource {
+	var result []Resource
+	for _, resource := range st.Resources {
+		if resource.Type == ResourceTypeExpressService && (cluster == "" || resource.Cluster == cluster) {
+			result = append(result, resource)
+		}
+	}
+	return result
 }
 
 // FindClusters returns all cluster resources in state.

@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -172,6 +173,24 @@ func TestFindServices_NoMatch(t *testing.T) {
 
 	if len(services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(services))
+	}
+}
+
+func TestExpressServiceConfigurationPersistsInRemoteStateDocument(t *testing.T) {
+	st := &State{Version: "1", Resources: []Resource{{
+		Type: ResourceTypeExpressService, Name: "api", Cluster: "prod", ARN: "arn:service", Configuration: "serviceName: api\nimage: app:v1\n",
+	}}}
+	data, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored State
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatal(err)
+	}
+	services := restored.FindExpressServices("prod")
+	if len(services) != 1 || services[0].Configuration != "serviceName: api\nimage: app:v1\n" {
+		t.Fatalf("restored Express state = %#v", services)
 	}
 }
 

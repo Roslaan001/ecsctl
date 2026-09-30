@@ -8,6 +8,7 @@
     "cluster": { "type": "string", "description": "Name of the ECS cluster." },
     "taskDefinition": { "type": "string", "description": "Task definition family:revision or ARN." },
     "launchType": { "type": "string", "enum": ["FARGATE", "EC2"], "default": "FARGATE" },
+    "schedulingStrategy": { "type": "string", "enum": ["REPLICA", "DAEMON"], "default": "REPLICA" },
     "desiredCount": { "type": "integer", "minimum": 0, "default": 1 },
     "network": {
       "type": "object",
@@ -45,6 +46,12 @@
     "autoScaling": { "type": "object", "properties": { "minCapacity": { "type": "integer", "minimum": 0 }, "maxCapacity": { "type": "integer", "minimum": 1 }, "metric": { "type": "string", "enum": ["CPU", "Memory"] }, "targetValue": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["minCapacity", "maxCapacity"], "additionalProperties": false },
     "tags": { "type": "object", "additionalProperties": { "type": "string" } }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "schedulingStrategy": { "const": "DAEMON" } }, "required": ["schedulingStrategy"] },
+      "then": { "properties": { "desiredCount": { "maximum": 0 } }, "not": { "required": ["autoScaling"] } }
+    }
+  ],
   "definitions": {
     "capacityProvider": { "type": "object", "properties": { "capacityProvider": { "type": "string" }, "weight": { "type": "integer", "minimum": 0 }, "base": { "type": "integer", "minimum": 0 } }, "required": ["capacityProvider"], "additionalProperties": false }
   },

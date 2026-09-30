@@ -29,6 +29,8 @@ func TestCreateExpressServiceMapsImageConfiguration(t *testing.T) {
 		Command:               []string{"./serve"},
 		Environment:           map[string]string{"MODE": "test"},
 		Secrets:               map[string]string{"TOKEN": "arn:aws:ssm:us-east-1:123456789012:parameter/token"},
+		AWSLogsConfiguration:  &ecscfg.ExpressAWSLogsConfig{LogGroup: "/ecs/demo", LogStreamPrefix: "app"},
+		RepositoryCredentials: &ecscfg.ExpressRepositoryCredentialsConfig{CredentialsParameter: "arn:aws:secretsmanager:us-east-1:123456789012:secret:registry"},
 		CPU:                   "512",
 		Memory:                "1024",
 		CPUArchitecture:       "ARM64",
@@ -68,6 +70,12 @@ func TestCreateExpressServiceMapsImageConfiguration(t *testing.T) {
 	if len(in.PrimaryContainer.Secrets) != 1 || awssdk.ToString(in.PrimaryContainer.Secrets[0].Name) != "TOKEN" {
 		t.Fatalf("secrets not mapped: %#v", in.PrimaryContainer.Secrets)
 	}
+	if in.PrimaryContainer.AwsLogsConfiguration == nil || awssdk.ToString(in.PrimaryContainer.AwsLogsConfiguration.LogGroup) != "/ecs/demo" || awssdk.ToString(in.PrimaryContainer.AwsLogsConfiguration.LogStreamPrefix) != "app" {
+		t.Fatalf("CloudWatch log configuration not mapped: %#v", in.PrimaryContainer.AwsLogsConfiguration)
+	}
+	if in.PrimaryContainer.RepositoryCredentials == nil || awssdk.ToString(in.PrimaryContainer.RepositoryCredentials.CredentialsParameter) != cfg.RepositoryCredentials.CredentialsParameter {
+		t.Fatalf("private registry credentials not mapped: %#v", in.PrimaryContainer.RepositoryCredentials)
+	}
 	if in.ScalingTarget == nil || awssdk.ToInt32(in.ScalingTarget.MinTaskCount) != 1 || awssdk.ToInt32(in.ScalingTarget.MaxTaskCount) != 4 || awssdk.ToInt32(in.ScalingTarget.AutoScalingTargetValue) != 65 {
 		t.Fatalf("scaling target not mapped: %#v", in.ScalingTarget)
 	}
@@ -92,6 +100,68 @@ func TestCreateExpressServiceTaskDefinitionMode(t *testing.T) {
 	}
 	if in.PrimaryContainer != nil || in.ExecutionRoleArn != nil || in.TaskRoleArn != nil || in.Cpu != nil || in.Memory != nil || in.CpuArchitecture != "" {
 		t.Fatalf("image-mode members should be omitted when a task definition is supplied: %#v", in)
+	}
+}
+
+func TestReconcileExpressServiceNoDriftDoesNotUpdate(t *testing.T) {
+	service := &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), ServiceArn: awssdk.String("service-arn"),
+		InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{
+			ServiceRevisionArn: awssdk.String("revision-1"), ExecutionRoleArn: awssdk.String("execution-role"), TaskRoleArn: awssdk.String("task-role"),
+			Cpu: awssdk.String("512"), Memory: awssdk.String("1024"), CpuArchitecture: types.ExpressCpuArchitectureArm64,
+			HealthCheckPath: awssdk.String("/health"),
+			PrimaryContainer: &types.ExpressGatewayContainer{
+				Image: awssdk.String("example/api:v1"), ContainerPort: awssdk.Int32(8080), Command: []string{"./serve"},
+				Environment: []types.KeyValuePair{{Name: awssdk.String("MODE"), Value: awssdk.String("prod")}},
+			},
+			NetworkConfiguration: &types.ExpressGatewayServiceNetworkConfiguration{Subnets: []string{"subnet-a"}, SecurityGroups: []string{"sg-a"}},
+			ScalingTarget:        &types.ExpressGatewayScalingTarget{MinTaskCount: awssdk.Int32(1), MaxTaskCount: awssdk.Int32(5), AutoScalingMetric: types.ExpressGatewayServiceScalingMetricAverageCPUUtilization, AutoScalingTargetValue: awssdk.Int32(60)},
+		}},
+	}
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: service}}
+	cfg := &ecscfg.ExpressServiceConfig{
+		ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", ExecutionRoleARN: "execution-role", TaskRoleARN: "task-role",
+		Image: "example/api:v1", ContainerPort: 8080, Command: []string{"./serve"}, Environment: map[string]string{"MODE": "prod"},
+		CPU: "512", Memory: "1024", CPUArchitecture: "ARM64", HealthCheckPath: "/health", Subnets: []string{"subnet-a"},
+		SecurityGroups: []string{"sg-a"}, MinTaskCount: 1, MaxTaskCount: 5, ScalingMetric: "AVERAGE_CPU", ScalingTargetValue: 60,
+	}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, false)
+	if err != nil || changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (false, nil)", changed, err)
+	}
+	if mock.updateExpressInput != nil {
+		t.Fatal("matching Express configuration should not trigger an update")
+	}
+}
+
+func TestReconcileExpressServiceDryRunReportsDriftWithoutUpdating(t *testing.T) {
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{ServiceRevisionArn: awssdk.String("revision-1"), PrimaryContainer: &types.ExpressGatewayContainer{Image: awssdk.String("example/api:v1")}}},
+	}}}
+	cfg := &ecscfg.ExpressServiceConfig{ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", Image: "example/api:v2"}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, true)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (true, nil)", changed, err)
+	}
+	if mock.updateExpressInput != nil {
+		t.Fatal("dry-run must not send an Express update")
+	}
+}
+
+func TestReconcileExpressServiceUpdatesOnlyWhenConfiguredFieldsDrift(t *testing.T) {
+	mock := &mockECS{describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{
+		ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod"), InfrastructureRoleArn: awssdk.String("infra-role"), CurrentDeployment: awssdk.String("revision-1"),
+		ActiveConfigurations: []types.ExpressGatewayServiceConfiguration{{ServiceRevisionArn: awssdk.String("revision-1"), PrimaryContainer: &types.ExpressGatewayContainer{Image: awssdk.String("example/api:v1")}}},
+	}}}
+	cfg := &ecscfg.ExpressServiceConfig{ServiceName: "api", Cluster: "prod", InfrastructureRoleARN: "infra-role", Image: "example/api:v2"}
+	changed, err := testClient(mock).ReconcileExpressService(context.Background(), "service-arn", cfg, false)
+	if err != nil || !changed {
+		t.Fatalf("ReconcileExpressService() = (%v, %v), want (true, nil)", changed, err)
+	}
+	if mock.updateExpressInput == nil || awssdk.ToString(mock.updateExpressInput.PrimaryContainer.Image) != cfg.Image {
+		t.Fatalf("expected update to desired container image, got %#v", mock.updateExpressInput)
 	}
 }
 
@@ -155,5 +225,22 @@ func TestDeleteExpressService(t *testing.T) {
 	}
 	if awssdk.ToString(mock.deleteExpressInput.ServiceArn) != "service-arn" {
 		t.Fatalf("delete request = %#v", mock.deleteExpressInput)
+	}
+}
+
+func TestListExpressServicesFiltersECSManagedResources(t *testing.T) {
+	mock := &mockECS{
+		listServicesOut:    &ecs.ListServicesOutput{ServiceArns: []string{"express-arn"}},
+		describeExpressOut: &ecs.DescribeExpressGatewayServiceOutput{Service: &types.ECSExpressGatewayService{ServiceArn: awssdk.String("express-arn"), ServiceName: awssdk.String("api"), Cluster: awssdk.String("prod")}},
+	}
+	services, err := testClient(mock).ListExpressServices(context.Background(), "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(services) != 1 || awssdk.ToString(services[0].ServiceName) != "api" {
+		t.Fatalf("services = %#v", services)
+	}
+	if awssdk.ToString(mock.listServicesIn.Cluster) != "prod" || mock.listServicesIn.ResourceManagementType != types.ResourceManagementTypeEcs {
+		t.Fatalf("list filter = %#v", mock.listServicesIn)
 	}
 }

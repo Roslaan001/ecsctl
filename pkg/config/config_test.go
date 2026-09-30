@@ -140,6 +140,31 @@ taskDefinition: my-task:1
 	if cfg.DesiredCount != 1 {
 		t.Errorf("DesiredCount default: got %d, want 1", cfg.DesiredCount)
 	}
+	if cfg.SchedulingStrategy != "REPLICA" {
+		t.Errorf("SchedulingStrategy default: got %q, want REPLICA", cfg.SchedulingStrategy)
+	}
+}
+
+func TestLoadServiceConfig_DaemonScheduling(t *testing.T) {
+	path := writeTemp(t, "name: agent\ncluster: prod\ntaskDefinition: agent:1\nschedulingStrategy: DAEMON\n")
+	cfg, err := LoadServiceConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SchedulingStrategy != "DAEMON" || cfg.DesiredCount != 0 {
+		t.Fatalf("daemon service config = %#v", cfg)
+	}
+}
+
+func TestLoadServiceConfig_RejectsDaemonDesiredCountAndScaling(t *testing.T) {
+	for _, input := range []string{
+		"name: agent\ncluster: prod\ntaskDefinition: agent:1\nschedulingStrategy: DAEMON\ndesiredCount: 1\n",
+		"name: agent\ncluster: prod\ntaskDefinition: agent:1\nschedulingStrategy: DAEMON\nautoScaling:\n  minCapacity: 0\n  maxCapacity: 2\n",
+	} {
+		if _, err := LoadServiceConfig(writeTemp(t, input)); err == nil {
+			t.Fatalf("expected invalid daemon config to fail: %s", input)
+		}
+	}
 }
 
 func TestLoadServiceConfig_MissingName(t *testing.T) {

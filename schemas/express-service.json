@@ -15,6 +15,21 @@
     "command": { "type": "array", "items": { "type": "string" } },
     "environment": { "type": "object", "additionalProperties": { "type": "string" } },
     "secrets": { "type": "object", "additionalProperties": { "type": "string" } },
+    "awsLogsConfiguration": {
+      "type": "object",
+      "properties": {
+        "logGroup": { "type": "string" },
+        "logStreamPrefix": { "type": "string" }
+      },
+      "required": ["logGroup", "logStreamPrefix"],
+      "additionalProperties": false
+    },
+    "repositoryCredentials": {
+      "type": "object",
+      "properties": { "credentialsParameter": { "type": "string" } },
+      "required": ["credentialsParameter"],
+      "additionalProperties": false
+    },
     "cpu": { "type": "string" },
     "memory": { "type": "string" },
     "cpuArchitecture": { "type": "string", "enum": ["X86_64", "ARM64"] },
