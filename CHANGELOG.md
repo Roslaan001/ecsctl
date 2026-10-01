@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Roslaan001/ecsctl/compare/v0.1.2...v0.2.0) (2026-10-01)
+
+
+### Features
+
+* **cluster:** add Fargate and EC2 defaults ([#16](https://github.com/Roslaan001/ecsctl/issues/16)) ([e81b609](https://github.com/Roslaan001/ecsctl/commit/e81b6090b6e9929c109a006cea6b32e3068b9d24))
+
 ## [0.1.2](https://github.com/Roslaan001/ecsctl/compare/v0.1.1...v0.1.2) (2026-10-01)
 
 
