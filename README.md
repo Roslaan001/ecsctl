@@ -334,3 +334,7 @@ make test-floci # runs ECS integration test against local Floci (requires Docker
 make lint      # runs golangci-lint checking
 make clean     # cleans up build outputs and binaries
 ```
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, commit message rules, pull request review, and CI checks.
