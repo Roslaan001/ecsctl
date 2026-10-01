@@ -6,7 +6,7 @@
 
 A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
-📖 **[Read the full documentation](https://ecsctl.abdulsomad005.workers.dev)**
+📖 **[Read the full documentation](https://roslaan001.github.io/ecsctl/)**
 
 ---
 
@@ -16,12 +16,12 @@ A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
 **macOS / Linux**:
 ```bash
-curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
+curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh
 ```
 
 **Windows (PowerShell)**:
 ```powershell
-irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
+irm https://roslaan001.github.io/ecsctl/install.ps1 | iex
 ```
 
 ### 2. Using `go install`
@@ -42,7 +42,7 @@ make install
 
 ## Documentation
 
-The full documentation is built with MkDocs and hosted at [ecsctl.abdulsomad005.workers.dev](https://ecsctl.abdulsomad005.workers.dev). Pull requests build the site, and pushes to `main` deploy it to Cloudflare Workers through [the Workers workflow](.github/workflows/workers.yml).
+The full documentation is built with MkDocs and hosted on [GitHub Pages](https://roslaan001.github.io/ecsctl/). Pull requests build the site, and pushes to `main` or `master` publish it to the `gh-pages` branch through [the docs workflow](.github/workflows/docs.yml). Installers download release archives directly from GitHub Releases.
 
 To preview the documentation locally, run:
 

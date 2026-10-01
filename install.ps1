@@ -43,7 +43,7 @@ Write-Host "Selected version: $Version"
 
 # Format download URL
 $FileName = "${Binary}_${VersionClean}_windows_${ArchName}.zip"
-$DownloadUrl = "https://ecsctl.abdulsomad005.workers.dev/bin/$FileName"
+$DownloadUrl = "https://github.com/$Repo/releases/download/$Version/$FileName"
 
 # Create installation directory
 $InstallDir = Join-Path $env:USERPROFILE ".ecsctl\bin"
