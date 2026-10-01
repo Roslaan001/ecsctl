@@ -472,3 +472,19 @@ func TestDeployServicePreservesTaskDefinitionFields(t *testing.T) {
 		t.Fatalf("container image not updated: %s", aws.ToString(in.ContainerDefinitions[0].Image))
 	}
 }
+
+func TestDeployServiceOmitsEmptyTaskDefinitionTags(t *testing.T) {
+	mock := &mockECS{
+		describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{TaskDefinition: aws.String("api:4")}}},
+		describeTaskDefOut: &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{
+			Family: aws.String("api"), ContainerDefinitions: []types.ContainerDefinition{{Name: aws.String("web"), Image: aws.String("old")}},
+		}},
+		registerTaskDefOut: &ecs.RegisterTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{TaskDefinitionArn: aws.String("api:5")}},
+	}
+	if _, err := testClient(mock).DeployService(context.Background(), "prod", "api", "web", "new-image"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mock.registerTaskDefIn.Tags; len(got) != 0 {
+		t.Fatalf("empty task definition tags should be omitted, got %#v", got)
+	}
+}
