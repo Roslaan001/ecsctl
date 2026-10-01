@@ -27,6 +27,9 @@ var (
 	createClusterName              string
 	createClusterRegion            string
 	createClusterCapacityProviders []string
+	createClusterEC2               bool
+	createClusterEC2InstanceType   string
+	createClusterEC2Count          int32
 	createClusterTags              []string // key=value pairs
 )
 
@@ -39,7 +42,11 @@ var createClusterCmd = &cobra.Command{
 
   # Inline flags
   ecsctl create cluster --name my-cluster --region eu-west-2
-  ecsctl create cluster --name my-cluster --region eu-west-2 --capacity-providers FARGATE,FARGATE_SPOT`,
+  ecsctl create cluster --name my-cluster --region eu-west-2 --ec2
+
+Without --ec2, new clusters default to FARGATE. With --ec2, ecsctl creates an
+EC2-backed cluster using the default VPC, t3.small instances, and an Auto Scaling
+capacity provider. Override the instance type or count with the corresponding flags.`,
 	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		var cfg *config.ClusterConfig
 		var err error
@@ -84,10 +91,29 @@ var createClusterCmd = &cobra.Command{
 			resolvedRegion = client.Region()
 		}
 
-		fmt.Printf("Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
-		if err := client.CreateCluster(context.Background(), cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+		if createClusterEC2 && (len(cfg.CapacityProviders) > 0 || len(cfg.DefaultCapacityProviderStrategy) > 0 || cmd.Flags().Changed("capacity-providers")) {
+			return fmt.Errorf("--ec2 configures its own EC2 capacity provider; remove custom capacity-provider settings")
+		}
+		if !createClusterEC2 && (cmd.Flags().Changed("ec2-instance-type") || cmd.Flags().Changed("ec2-count")) {
+			return fmt.Errorf("--ec2-instance-type and --ec2-count require --ec2")
+		}
+		if createClusterEC2 && createClusterEC2Count < 1 {
+			return fmt.Errorf("--ec2-count must be at least 1")
+		}
+		if createClusterEC2 {
+			fmt.Printf("Creating EC2-backed cluster %q in %s (instance type %s, count %d)...\n", cfg.Name, resolvedRegion, createClusterEC2InstanceType, createClusterEC2Count)
+		} else {
+			fmt.Printf("Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
+		}
+		var createErr error
+		if createClusterEC2 {
+			createErr = client.CreateEC2Cluster(context.Background(), cfg, createClusterEC2InstanceType, createClusterEC2Count)
+		} else {
+			createErr = client.CreateCluster(context.Background(), cfg)
+		}
+		if createErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", createErr)
+			return createErr
 		}
 
 		fmt.Printf("✓ Cluster %q created successfully.\n", cfg.Name)
@@ -241,7 +267,10 @@ func init() {
 	createClusterCmd.Flags().StringVarP(&createClusterFile, "file", "f", "", "Path to cluster config YAML")
 	createClusterCmd.Flags().StringVar(&createClusterName, "name", "", "Cluster name")
 	createClusterCmd.Flags().StringVar(&createClusterRegion, "region", "", "AWS region (e.g. eu-west-2)")
-	createClusterCmd.Flags().StringSliceVar(&createClusterCapacityProviders, "capacity-providers", nil, "Capacity providers, e.g. FARGATE,FARGATE_SPOT (optional)")
+	createClusterCmd.Flags().StringSliceVar(&createClusterCapacityProviders, "capacity-providers", nil, "Capacity providers (defaults to FARGATE; incompatible with --ec2)")
+	createClusterCmd.Flags().BoolVar(&createClusterEC2, "ec2", false, "Create an EC2-backed cluster in the default VPC")
+	createClusterCmd.Flags().StringVar(&createClusterEC2InstanceType, "ec2-instance-type", "t3.small", "EC2 instance type used with --ec2")
+	createClusterCmd.Flags().Int32Var(&createClusterEC2Count, "ec2-count", 1, "Initial EC2 instance count used with --ec2")
 	createClusterCmd.Flags().StringArrayVar(&createClusterTags, "tags", nil, "Tags as key=value pairs (repeatable: --tags env=prod --tags team=platform)")
 
 	// create service flags
@@ -249,7 +278,7 @@ func init() {
 	createServiceCmd.Flags().StringVar(&createServiceName, "name", "", "Service name")
 	createServiceCmd.Flags().StringVar(&createServiceCluster, "cluster", "", "ECS cluster name")
 	createServiceCmd.Flags().StringVar(&createServiceTaskDefinition, "task-definition", "", "Task definition family:revision (e.g. my-task:3)")
-	createServiceCmd.Flags().StringVar(&createServiceLaunchType, "launch-type", "FARGATE", "Launch type: FARGATE or EC2")
+	createServiceCmd.Flags().StringVar(&createServiceLaunchType, "launch-type", "", "Launch type: FARGATE or EC2 (defaults to the cluster capacity-provider strategy)")
 	createServiceCmd.Flags().StringVar(&createServiceSchedulingStrategy, "scheduling-strategy", "REPLICA", "Scheduling strategy: REPLICA or DAEMON")
 	createServiceCmd.Flags().Int32Var(&createServiceDesiredCount, "desired-count", 1, "Desired task count")
 	createServiceCmd.Flags().StringSliceVar(&createServiceSubnets, "subnets", nil, "Subnet IDs (comma-separated)")

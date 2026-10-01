@@ -66,8 +66,13 @@ ecsctl create cluster --name NAME [--region REGION] [--capacity-providers LIST]
 | `-f, --file` | string | YAML configuration file. |
 | `--name` | string | Cluster name. Required when `-f` is omitted. |
 | `--region` | string | AWS region. |
-| `--capacity-providers` | string slice | Capacity providers, such as `FARGATE,FARGATE_SPOT`. |
+| `--capacity-providers` | string slice | Capacity providers, such as `FARGATE,FARGATE_SPOT`. Defaults to `FARGATE`; incompatible with `--ec2`. |
+| `--ec2` | boolean | Create an EC2-backed cluster in the default VPC. |
+| `--ec2-instance-type` | string | EC2 instance type for `--ec2`. Defaults to `t3.small`. |
+| `--ec2-count` | int | Initial EC2 instance count for `--ec2`. Defaults to `1`. |
 | `--tags` | string array | Tags in `key=value` form. |
+
+Without `--ec2`, new clusters default to Fargate. EC2-backed clusters default to EC2 capacity; creating and running instances incurs AWS charges.
 
 #### `create service`
 
@@ -82,7 +87,7 @@ ecsctl create service --name NAME --cluster CLUSTER --task-definition FAMILY:REV
 | `--name` | string | Service name. Required when `-f` is omitted. |
 | `--cluster` | string | Cluster name. Required when `-f` is omitted. |
 | `--task-definition` | string | Task definition family and revision. Required when `-f` is omitted. |
-| `--launch-type` | string | `FARGATE` or `EC2`. Defaults to `FARGATE`. |
+| `--launch-type` | string | `FARGATE` or `EC2`. Defaults to the cluster's capacity-provider strategy. |
 | `--scheduling-strategy` | string | `REPLICA` or `DAEMON`. Defaults to `REPLICA`. |
 | `--desired-count` | int | Number of tasks to run. Defaults to `1`. |
 | `--subnets` | string slice | Subnet IDs. |
@@ -194,6 +199,7 @@ ecsctl exec SERVICE --cluster CLUSTER [--container NAME] [--command COMMAND] [--
 | `--cluster` | string | Target cluster. Required. |
 | `--task-definition` | string | Task definition family and revision, or ARN. Required. |
 | `--count` | int | Number of tasks to start. Defaults to `1`. |
+| `--launch-type` | string | `FARGATE` or `EC2`. Defaults to the cluster's capacity-provider strategy. |
 | `--subnets` | string slice | Subnet IDs. |
 | `--security-groups` | string slice | Security group IDs. |
 | `--assign-public-ip` | string | `ENABLED` or `DISABLED`. Defaults to `DISABLED`. |
