@@ -204,7 +204,7 @@ var expressDeleteCmd = &cobra.Command{Use: "delete", Short: "Delete an ECS Expre
 	fmt.Printf("Deletion started for Express service %s\n", expressARN)
 	if session != nil {
 		if err := session.Update(func(st *state.State) { st.RemoveResourceByARN(expressARN) }); err != nil {
-			return fmt.Errorf("Express service deletion started but remote state was not updated: %w", err)
+			return fmt.Errorf("express service deletion started but remote state was not updated: %w", err)
 		}
 	}
 	return nil
