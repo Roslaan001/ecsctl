@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.1](https://github.com/Roslaan001/ecsctl/compare/v0.1.0...v0.1.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* restore CI for state drift changes ([73ded05](https://github.com/Roslaan001/ecsctl/commit/73ded053501c113a7067bd9d6a2b7a080f378343))
+* satisfy lint for Express deletion error ([65ae18f](https://github.com/Roslaan001/ecsctl/commit/65ae18fb5dfaf6314868327a4f2d68f346630793))
+* satisfy lint for Express state errors ([ab5861f](https://github.com/Roslaan001/ecsctl/commit/ab5861f273b175dab94abd7b69402b70722c7430))
+
 ## [0.1.0](https://github.com/Roslaan001/ecsctl/compare/v0.0.5...v0.1.0) (2026-09-30)
 
 
