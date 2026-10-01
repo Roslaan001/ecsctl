@@ -696,7 +696,7 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 	}
 
 	// 4. Register a new task definition revision
-	newTD, err := c.ecs.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
+	registerInput := &ecs.RegisterTaskDefinitionInput{
 		Family:                  td.Family,
 		ContainerDefinitions:    containers,
 		Cpu:                     td.Cpu,
@@ -713,8 +713,13 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 		PlacementConstraints:    td.PlacementConstraints,
 		ProxyConfiguration:      td.ProxyConfiguration,
 		RuntimePlatform:         td.RuntimePlatform,
-		Tags:                    tdOut.Tags,
-	})
+	}
+	// ECS rejects an explicitly empty Tags list. Preserve tags when present,
+	// while leaving the field omitted when the current task definition has none.
+	if len(tdOut.Tags) > 0 {
+		registerInput.Tags = tdOut.Tags
+	}
+	newTD, err := c.ecs.RegisterTaskDefinition(ctx, registerInput)
 	if err != nil {
 		return "", fmt.Errorf("registering task definition: %w", err)
 	}

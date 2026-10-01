@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
@@ -334,3 +334,7 @@ make test-floci # runs ECS integration test against local Floci (requires Docker
 make lint      # runs golangci-lint checking
 make clean     # cleans up build outputs and binaries
 ```
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, commit message rules, pull request review, and CI checks.

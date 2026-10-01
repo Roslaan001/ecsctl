@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Roslaan001/ecsctl/blob/main/LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/Roslaan001/ecsctl/blob/main/LICENSE)
 
 `ecsctl` is a command-line tool for creating and operating Amazon ECS clusters, services, and tasks. Use configuration files when you want to describe a resource and reconcile it over time. Use direct commands for one-time operations such as running a task, checking logs, or deploying a new image.
 
