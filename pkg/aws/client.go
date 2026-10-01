@@ -13,9 +13,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/applicationautoscaling"
 	applicationautoscalingTypes "github.com/aws/aws-sdk-go-v2/service/applicationautoscaling/types"
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"gopkg.in/yaml.v3"
@@ -25,6 +29,9 @@ import (
 // Defining it as an interface allows tests to inject a mock.
 type ecsIface interface {
 	CreateCluster(ctx context.Context, params *ecs.CreateClusterInput, optFns ...func(*ecs.Options)) (*ecs.CreateClusterOutput, error)
+	CreateCapacityProvider(ctx context.Context, params *ecs.CreateCapacityProviderInput, optFns ...func(*ecs.Options)) (*ecs.CreateCapacityProviderOutput, error)
+	DeleteCapacityProvider(ctx context.Context, params *ecs.DeleteCapacityProviderInput, optFns ...func(*ecs.Options)) (*ecs.DeleteCapacityProviderOutput, error)
+	DescribeCapacityProviders(ctx context.Context, params *ecs.DescribeCapacityProvidersInput, optFns ...func(*ecs.Options)) (*ecs.DescribeCapacityProvidersOutput, error)
 	UpdateCluster(ctx context.Context, params *ecs.UpdateClusterInput, optFns ...func(*ecs.Options)) (*ecs.UpdateClusterOutput, error)
 	PutClusterCapacityProviders(ctx context.Context, params *ecs.PutClusterCapacityProvidersInput, optFns ...func(*ecs.Options)) (*ecs.PutClusterCapacityProvidersOutput, error)
 	DeleteCluster(ctx context.Context, params *ecs.DeleteClusterInput, optFns ...func(*ecs.Options)) (*ecs.DeleteClusterOutput, error)
@@ -62,6 +69,10 @@ type Client struct {
 	ecs         ecsIface
 	logs        *cloudwatchlogs.Client
 	autoscaling applicationAutoScalingIface
+	ec2         *ec2.Client
+	awsScaling  *autoscaling.Client
+	iam         *iam.Client
+	ssm         *ssm.Client
 	region      string
 }
 
@@ -87,6 +98,7 @@ type RunTaskOptions struct {
 	Cluster        string
 	TaskDefinition string
 	Count          int32
+	LaunchType     string
 	Subnets        []string
 	SecurityGroups []string
 	AssignPublicIP string
@@ -101,7 +113,7 @@ func (c *Client) RegisterTaskDefinition(ctx context.Context, input *ecs.Register
 }
 
 func (c *Client) RunTask(ctx context.Context, opts RunTaskOptions) ([]string, error) {
-	input := &ecs.RunTaskInput{Cluster: aws.String(opts.Cluster), TaskDefinition: aws.String(opts.TaskDefinition), Count: aws.Int32(opts.Count), LaunchType: types.LaunchTypeFargate}
+	input := &ecs.RunTaskInput{Cluster: aws.String(opts.Cluster), TaskDefinition: aws.String(opts.TaskDefinition), Count: aws.Int32(opts.Count), LaunchType: types.LaunchType(opts.LaunchType)}
 	if len(opts.Subnets) > 0 || len(opts.SecurityGroups) > 0 {
 		input.NetworkConfiguration = &types.NetworkConfiguration{AwsvpcConfiguration: &types.AwsVpcConfiguration{Subnets: opts.Subnets, SecurityGroups: opts.SecurityGroups, AssignPublicIp: types.AssignPublicIp(opts.AssignPublicIP)}}
 	}
@@ -145,6 +157,10 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 		ecs:         ecs.NewFromConfig(cfg),
 		logs:        cloudwatchlogs.NewFromConfig(cfg),
 		autoscaling: applicationautoscaling.NewFromConfig(cfg),
+		ec2:         ec2.NewFromConfig(cfg),
+		awsScaling:  autoscaling.NewFromConfig(cfg),
+		iam:         iam.NewFromConfig(cfg),
+		ssm:         ssm.NewFromConfig(cfg),
 		region:      cfg.Region,
 	}, nil
 }
@@ -201,12 +217,24 @@ func (c *Client) CreateCluster(ctx context.Context, cfg *ecscfg.ClusterConfig) e
 		Tags:        toECSTags(cfg.Tags),
 	}
 
-	// Only set capacity providers when explicitly specified — omitting them avoids
-	// the service-linked role assumption that can fail on fresh accounts.
-	if len(cfg.CapacityProviders) > 0 {
-		input.CapacityProviders = cfg.CapacityProviders
+	// A new cluster should be ready for the default Fargate workflow without
+	// requiring users to know ECS capacity-provider setup. Preserve explicit YAML
+	// values, and only choose FARGATE as the default strategy when it is attached.
+	capacityProviders := cfg.CapacityProviders
+	if len(capacityProviders) == 0 {
+		capacityProviders = []string{"FARGATE"}
 	}
-	input.DefaultCapacityProviderStrategy = toCapacityProviderStrategy(cfg.DefaultCapacityProviderStrategy)
+	input.CapacityProviders = capacityProviders
+	strategy := cfg.DefaultCapacityProviderStrategy
+	if len(strategy) == 0 {
+		for _, provider := range capacityProviders {
+			if provider == "FARGATE" {
+				strategy = []ecscfg.CapacityProviderStrategyConfig{{CapacityProvider: "FARGATE", Weight: 1}}
+				break
+			}
+		}
+	}
+	input.DefaultCapacityProviderStrategy = toCapacityProviderStrategy(strategy)
 	if cfg.ServiceConnectDefaultsNamespace != "" {
 		input.ServiceConnectDefaults = &types.ClusterServiceConnectDefaultsRequest{Namespace: aws.String(cfg.ServiceConnectDefaultsNamespace)}
 	}
@@ -407,6 +435,9 @@ func (c *Client) DeleteCluster(ctx context.Context, clusterName string, force bo
 			}
 		}
 	}
+	if err := c.deleteEC2ClusterResources(ctx, clusterName, false); err != nil {
+		return err
+	}
 
 	_, err = c.ecs.DeleteCluster(ctx, &ecs.DeleteClusterInput{
 		Cluster: aws.String(clusterName),
@@ -436,9 +467,6 @@ func (c *Client) CreateService(ctx context.Context, cfg *ecscfg.ServiceConfig) e
 		schedulingStrategy = "REPLICA"
 	}
 	launchType := cfg.LaunchType
-	if launchType == "" && len(cfg.CapacityProviderStrategy) == 0 {
-		launchType = "FARGATE"
-	}
 	input := &ecs.CreateServiceInput{
 		Cluster:                 aws.String(cfg.Cluster),
 		ServiceName:             aws.String(cfg.Name),

@@ -67,6 +67,15 @@ func (m *mockECS) CreateCluster(_ context.Context, input *ecs.CreateClusterInput
 	m.createClusterInput = input
 	return &ecs.CreateClusterOutput{}, m.createClusterErr
 }
+func (m *mockECS) CreateCapacityProvider(_ context.Context, _ *ecs.CreateCapacityProviderInput, _ ...func(*ecs.Options)) (*ecs.CreateCapacityProviderOutput, error) {
+	panic("unexpected: CreateCapacityProvider")
+}
+func (m *mockECS) DeleteCapacityProvider(_ context.Context, _ *ecs.DeleteCapacityProviderInput, _ ...func(*ecs.Options)) (*ecs.DeleteCapacityProviderOutput, error) {
+	panic("unexpected: DeleteCapacityProvider")
+}
+func (m *mockECS) DescribeCapacityProviders(_ context.Context, _ *ecs.DescribeCapacityProvidersInput, _ ...func(*ecs.Options)) (*ecs.DescribeCapacityProvidersOutput, error) {
+	panic("unexpected: DescribeCapacityProviders")
+}
 func (m *mockECS) UpdateCluster(_ context.Context, input *ecs.UpdateClusterInput, _ ...func(*ecs.Options)) (*ecs.UpdateClusterOutput, error) {
 	m.updateClusterInput = input
 	return &ecs.UpdateClusterOutput{}, m.updateClusterErr

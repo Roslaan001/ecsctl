@@ -120,8 +120,18 @@ ecsctl create service -f service.yaml
 
 # Create directly using inline flags
 ecsctl create cluster --name my-cluster --region us-east-1
+ecsctl create cluster --name my-ec2-cluster --region us-east-1 --ec2
 ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3
 ```
+
+New clusters attach the `FARGATE` capacity provider and use it as the default
+capacity-provider strategy. Add `--ec2` to create an EC2-backed cluster using
+the region's default VPC, an ECS-optimized Amazon Linux 2023 image, and a `t3.small`
+instance by default. ECS creates one instance initially and manages the Auto
+Scaling group capacity; use `--ec2-instance-type` and `--ec2-count` to change the
+defaults. EC2 instances incur charges while running. Services and one-off tasks
+use the cluster's default capacity-provider strategy unless you select a launch
+type explicitly.
 
 ECS service YAML can also configure capacity-provider strategies, deployment controllers and safety settings, load balancers, Service Connect, placement, ECS Exec, tags, and Application Auto Scaling. See [the declarative configuration guide](docs/declarative.md).
 
@@ -138,7 +148,8 @@ See the [Express Mode guide](docs/express.md) for the role requirements and YAML
 
 ### Task definitions and one-off tasks
 
-Register a task definition JSON file and run or stop standalone Fargate tasks:
+Register a task definition JSON file and run or stop standalone ECS tasks. Unless
+you pass `--launch-type`, ECS uses the cluster's default capacity-provider strategy:
 
 ```bash
 ecsctl register task-definition -f task-definition.json
