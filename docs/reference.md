@@ -50,7 +50,9 @@ ecsctl
 │   ├── use-context
 │   ├── import
 │   ├── config
-│   └── show
+│   ├── show
+│   ├── drift
+│   └── unlock --force
 └── version          - Print build version and compilation information
 ```
 
@@ -107,6 +109,8 @@ Show detailed configuration and runtime status.
 
 ### `list`
 List resources from remote state or live AWS.
+* **Flags**:
+  * `--live`: Query AWS directly instead of using the saved state inventory.
 * **Subcommands**:
   * `list clusters`: List clusters.
   * `list services`: List services in a cluster.
@@ -183,6 +187,8 @@ Manage remote state backend contexts.
       * `--cluster` (string, required): Cluster name.
   * `state config <cluster|service|express> <name>`: Print captured YAML configuration. Service and Express resources accept `--cluster`; an active state context is required.
   * `state show`: Print details of active context and tracked resources.
+  * `state drift`: Read-only comparison of tracked configurations with live ECS resources.
+  * `state unlock --force`: Remove a stale state lock after confirming no operation is active.
 
 ### `version`
 Print build version and compilation details.

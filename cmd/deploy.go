@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/roslaan001/ecsctl/pkg/aws"
+	"github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +24,15 @@ var deployCmd = &cobra.Command{
 	Example: `  ecsctl deploy my-service --image nginx:1.25 --cluster my-cluster
   ecsctl deploy my-service --image nginx:1.25 --cluster my-cluster --container web
   ecsctl deploy my-service --image nginx:1.25 --cluster my-cluster --wait`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		serviceName := args[0]
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+		}
 
 		client, err := aws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
@@ -36,6 +44,13 @@ var deployCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
+		}
+		if session != nil {
+			if err := updateTrackedServiceConfig(session, client, deployCluster, serviceName, func(cfg *config.ServiceConfig) {
+				cfg.TaskDefinition = newTaskDef
+			}); err != nil {
+				return fmt.Errorf("deployment started but tracked state was not updated: %w", err)
+			}
 		}
 
 		fmt.Printf("✓ Deployment triggered for service %q (task def: %s).\n", serviceName, newTaskDef)

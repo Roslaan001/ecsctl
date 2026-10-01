@@ -33,6 +33,10 @@ ECS may take time to start tasks and make a service healthy. Add `--wait` when y
 ecsctl apply -f service.yaml --wait
 ```
 
+For an existing resource, `--dry-run` lists the configured fields that differ from AWS. It does not include fields omitted from the YAML. For a service, omitting `desiredCount` leaves the live count alone; set `desiredCount: 0` to intentionally scale it to zero. For list-valued settings such as `capacityProviders`, `capacityProviderStrategy`, `loadBalancers`, `serviceRegistries`, `placementConstraints`, and `placementStrategy`, use an explicit empty list (`[]`) to clear existing values; omit the property to leave it unchanged.
+
+For a cluster file, `region` selects the AWS region unless the global `--region` flag overrides it.
+
 ## IDE Integration & Validation
 
 `ecsctl` provides JSON Schemas for both Cluster and Service configurations. This allows modern editors (like VS Code, IntelliJ, and GoLand) to provide auto-completion, hover definitions, and real-time validation for your configuration files.

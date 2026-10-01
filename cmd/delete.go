@@ -27,12 +27,26 @@ var deleteClusterCmd = &cobra.Command{
 	Short:   "Delete an ECS cluster",
 	Args:    cobra.ExactArgs(1),
 	Example: `  ecsctl delete cluster my-cluster`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		clusterName := args[0]
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+		}
 
 		client, err := aws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
+		}
+		var clusterARN string
+		if session != nil {
+			clusterARN, err = client.ClusterARN(context.Background(), clusterName)
+			if err != nil {
+				return err
+			}
 		}
 
 		fmt.Printf("Deleting cluster %q...\n", clusterName)
@@ -42,8 +56,12 @@ var deleteClusterCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Cluster %q deleted.\n", clusterName)
-		if err := removeClusterFromState(clusterName); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: cluster deleted but state not updated: %v\n", err)
+		if session != nil {
+			if err := session.Update(func(st *state.State) {
+				st.RemoveClusterAndServicesByARN(clusterName, clusterARN, client.Region())
+			}); err != nil {
+				return fmt.Errorf("cluster deleted but remote state was not updated: %w", err)
+			}
 		}
 		return nil
 	},
@@ -55,12 +73,26 @@ var deleteServiceCmd = &cobra.Command{
 	Short:   "Delete an ECS service",
 	Args:    cobra.ExactArgs(1),
 	Example: `  ecsctl delete service my-service --cluster my-cluster`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		serviceName := args[0]
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+		}
 
 		client, err := aws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
+		}
+		var serviceARN string
+		if session != nil {
+			serviceARN, err = client.ServiceARN(context.Background(), deleteCluster, serviceName)
+			if err != nil {
+				return err
+			}
 		}
 
 		fmt.Printf("Deleting service %q from cluster %q...\n", serviceName, deleteCluster)
@@ -70,8 +102,10 @@ var deleteServiceCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Service %q deleted.\n", serviceName)
-		if err := removeFromState(state.ResourceTypeService, serviceName, deleteCluster); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: service deleted but state not updated: %v\n", err)
+		if session != nil {
+			if err := session.Update(func(st *state.State) { st.RemoveResourceByARN(serviceARN) }); err != nil {
+				return fmt.Errorf("service deleted but remote state was not updated: %w", err)
+			}
 		}
 		return nil
 	},
@@ -85,19 +119,4 @@ func init() {
 
 	deleteCmd.AddCommand(deleteClusterCmd)
 	deleteCmd.AddCommand(deleteServiceCmd)
-}
-
-// removeFromState removes a resource from remote state after deletion.
-// Silently skips if no state context is configured.
-func removeFromState(resourceType state.ResourceType, name, cluster string) error {
-	return writeState(func(st *state.State) {
-		st.RemoveResource(resourceType, name, cluster)
-	})
-}
-
-// removeClusterFromState removes the cluster and all services inside it from remote state.
-func removeClusterFromState(clusterName string) error {
-	return writeState(func(st *state.State) {
-		st.RemoveClusterAndServices(clusterName)
-	})
 }

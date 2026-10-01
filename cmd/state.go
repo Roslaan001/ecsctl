@@ -9,15 +9,55 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	ecsaws "github.com/roslaan001/ecsctl/pkg/aws"
+	"github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/roslaan001/ecsctl/pkg/localconfig"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // stateCmd is the parent for all "state" subcommands.
 var stateCmd = &cobra.Command{
 	Use:   "state",
 	Short: "Manage ecsctl remote state",
+}
+
+var stateUnlockForce bool
+
+var stateUnlockCmd = &cobra.Command{
+	Use:   "unlock",
+	Short: "Force-remove a stale state lock",
+	Long:  "Remove the active context's state lock. Use only after confirming no ecsctl operation is still running against that context.",
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		if !stateUnlockForce {
+			return fmt.Errorf("refusing to remove a state lock without --force")
+		}
+		localCfg, err := localconfig.Load()
+		if err != nil {
+			return err
+		}
+		_, activeCtx, err := localCfg.GetActiveContext(stateContext)
+		if err != nil {
+			return err
+		}
+		backend, err := state.NewBackend(context.Background(), activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)
+		if err != nil {
+			return err
+		}
+		info, err := backend.LockInfo(context.Background())
+		if err != nil {
+			return fmt.Errorf("reading lock info: %w", err)
+		}
+		if info == "not locked" {
+			fmt.Println("No state lock is present.")
+			return nil
+		}
+		if err := backend.ForceUnlock(context.Background()); err != nil {
+			return fmt.Errorf("removing state lock held by %s: %w", info, err)
+		}
+		fmt.Printf("Removed state lock held by %s.\n", info)
+		return nil
+	},
 }
 
 // ---------- state init ----------
@@ -188,7 +228,7 @@ var stateImportCmd = &cobra.Command{
 	Example: `  ecsctl state import cluster my-cluster --region eu-west-2
   ecsctl state import service my-service --cluster my-cluster --region eu-west-2
   ecsctl state import express my-api --cluster my-cluster --region eu-west-2`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		resourceType := args[0]
 		resourceName := args[1]
 		ctx := context.Background()
@@ -262,9 +302,12 @@ var stateImportCmd = &cobra.Command{
 		default:
 			return fmt.Errorf("unknown resource type %q — supported: cluster, service, express", resourceType)
 		}
+		res.Region = resolvedRegion
 
 		// Load state, add resource, save
-		backend, err := state.NewBackend(ctx, activeCtx.Bucket, activeCtx.Key, resolvedRegion, resolvedProfile, activeCtx.KmsKeyID)
+		// The context's region/profile belong to the state bucket. Resource
+		// --region/--profile overrides apply only to the ECS lookup above.
+		backend, err := state.NewBackend(ctx, activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)
 		if err != nil {
 			return err
 		}
@@ -272,7 +315,15 @@ var stateImportCmd = &cobra.Command{
 		if err := backend.Lock(ctx); err != nil {
 			return err
 		}
-		defer backend.Unlock(ctx) //nolint:errcheck
+		defer func() {
+			if err := backend.Unlock(ctx); err != nil {
+				if runErr != nil {
+					runErr = fmt.Errorf("%v; releasing state lock: %w", runErr, err)
+				} else {
+					runErr = fmt.Errorf("releasing state lock: %w", err)
+				}
+			}
+		}()
 
 		st, err := backend.Load(ctx)
 		if err != nil {
@@ -374,6 +425,121 @@ var stateShowCmd = &cobra.Command{
 	},
 }
 
+var stateDriftCmd = &cobra.Command{
+	Use:   "drift",
+	Short: "Check tracked resources for configuration drift",
+	Long:  "Compare each tracked resource with its saved configuration. This is a read-only scan; it reports drift without applying changes.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		localCfg, err := localconfig.Load()
+		if err != nil {
+			return fmt.Errorf("loading local config: %w", err)
+		}
+		ctxName, activeCtx, err := localCfg.GetActiveContext(stateContext)
+		if err != nil {
+			return err
+		}
+		backend, err := state.NewBackend(ctx, activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)
+		if err != nil {
+			return err
+		}
+		st, err := backend.Load(ctx)
+		if err != nil {
+			return fmt.Errorf("loading state for context %q: %w", ctxName, err)
+		}
+		if len(st.Resources) == 0 {
+			fmt.Printf("No resources tracked in context %q.\n", ctxName)
+			return nil
+		}
+
+		var drifted, current, skipped, failed int
+		for _, resource := range st.Resources {
+			if resource.Configuration == "" {
+				fmt.Printf("[skipped] %s %q: no saved configuration (imported resource may need state config refreshed)\n", resource.Type, resource.Name)
+				skipped++
+				continue
+			}
+
+			resolvedProfile := profile
+			if resolvedProfile == "" {
+				resolvedProfile = activeCtx.Profile
+			}
+
+			var clusterCfg config.ClusterConfig
+			var serviceCfg *config.ServiceConfig
+			var expressCfg config.ExpressServiceConfig
+			switch resource.Type {
+			case state.ResourceTypeCluster:
+				if err := yaml.Unmarshal([]byte(resource.Configuration), &clusterCfg); err != nil {
+					fmt.Printf("[error] cluster %q: decoding saved configuration: %v\n", resource.Name, err)
+					failed++
+					continue
+				}
+			case state.ResourceTypeService:
+				serviceCfg, err = config.DecodeServiceConfig([]byte(resource.Configuration))
+				if err != nil {
+					fmt.Printf("[error] service %q: decoding saved configuration: %v\n", resource.Name, err)
+					failed++
+					continue
+				}
+			case state.ResourceTypeExpressService:
+				if err := yaml.Unmarshal([]byte(resource.Configuration), &expressCfg); err != nil {
+					fmt.Printf("[error] express service %q: decoding saved configuration: %v\n", resource.Name, err)
+					failed++
+					continue
+				}
+			default:
+				fmt.Printf("[skipped] %s %q: unsupported tracked resource type\n", resource.Type, resource.Name)
+				skipped++
+				continue
+			}
+			resolvedRegion := region
+			if resolvedRegion == "" {
+				resolvedRegion = resource.Region
+			}
+			if resolvedRegion == "" && resource.Type == state.ResourceTypeCluster {
+				resolvedRegion = clusterCfg.Region
+			}
+			if resolvedRegion == "" {
+				resolvedRegion = activeCtx.Region
+			}
+
+			client, err := ecsaws.NewECSClient(ctx, resolvedRegion, resolvedProfile)
+			if err != nil {
+				fmt.Printf("[error] %s %q: creating AWS client: %v\n", resource.Type, resource.Name, err)
+				failed++
+				continue
+			}
+			var changed bool
+			switch resource.Type {
+			case state.ResourceTypeCluster:
+				changed, err = client.ReconcileCluster(ctx, &clusterCfg, true)
+			case state.ResourceTypeService:
+				changed, err = client.ReconcileService(ctx, serviceCfg, true)
+			case state.ResourceTypeExpressService:
+				changed, err = client.ReconcileExpressService(ctx, resource.ARN, &expressCfg, true)
+			}
+			if err != nil {
+				fmt.Printf("[error] %s %q: %v\n", resource.Type, resource.Name, err)
+				failed++
+				continue
+			}
+			if changed {
+				fmt.Printf("[drift] %s %q\n", resource.Type, resource.Name)
+				drifted++
+			} else {
+				fmt.Printf("[ok] %s %q is up to date\n", resource.Type, resource.Name)
+				current++
+			}
+		}
+		fmt.Printf("\nDrift scan: %d drifted, %d up to date, %d skipped, %d errors.\n", drifted, current, skipped, failed)
+		if failed > 0 {
+			return fmt.Errorf("drift scan completed with %d error(s)", failed)
+		}
+		return nil
+	},
+}
+
 var (
 	stateConfigCluster string
 )
@@ -418,6 +584,9 @@ var stateConfigCmd = &cobra.Command{
 }
 
 func init() {
+	stateUnlockCmd.Flags().BoolVar(&stateUnlockForce, "force", false, "Confirm removal of the current state lock")
+	stateCmd.AddCommand(stateUnlockCmd)
+
 	// state init flags
 	stateInitCmd.Flags().StringVar(&stateInitContext, "context", "default", "Context name to create")
 	stateInitCmd.Flags().StringVar(&stateInitBucket, "bucket", "", "S3 bucket name for remote state (required)")
@@ -437,6 +606,7 @@ func init() {
 	stateCmd.AddCommand(stateListContextsCmd)
 	stateCmd.AddCommand(stateImportCmd)
 	stateCmd.AddCommand(stateShowCmd)
+	stateCmd.AddCommand(stateDriftCmd)
 	stateConfigCmd.Flags().StringVar(&stateConfigCluster, "cluster", "", "Cluster name when selecting a service")
 	stateCmd.AddCommand(stateConfigCmd)
 }

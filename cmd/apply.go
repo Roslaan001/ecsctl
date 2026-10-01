@@ -23,32 +23,56 @@ var applyCmd = &cobra.Command{
 	Example: `  ecsctl apply -f cluster.yaml
   ecsctl apply -f service.yaml --wait
   ecsctl apply -f service.yaml --dry-run`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		// Detect resource type from the file
 		resourceType, err := config.DetectResourceType(applyFile)
 		if err != nil {
 			return fmt.Errorf("reading config: %w", err)
 		}
 
-		client, err := aws.NewECSClient(context.Background(), region, profile)
+		// Cluster files can select their own region. An explicit --region flag
+		// still takes precedence, matching the documented CLI behavior.
+		clientRegion := region
+		if resourceType == "cluster" && clientRegion == "" {
+			cfg, err := config.LoadClusterConfig(applyFile)
+			if err != nil {
+				return err
+			}
+			clientRegion = cfg.Region
+		}
+		var session *stateSession
+		if !applyDryRun {
+			session, err = beginStateSession(context.Background())
+			if err != nil {
+				return fmt.Errorf("locking remote state: %w", err)
+			}
+			if session != nil {
+				defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+			}
+		}
+
+		client, err := aws.NewECSClient(context.Background(), clientRegion, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
+		}
+		if clientRegion == "" {
+			clientRegion = client.Region()
 		}
 
 		switch resourceType {
 		case "cluster":
-			return applyCluster(client, applyFile)
+			return applyCluster(client, applyFile, session, clientRegion)
 		case "service":
-			return applyService(client, applyFile)
+			return applyService(client, applyFile, session)
 		case "express-service":
-			return applyExpressService(client, applyFile)
+			return applyExpressService(client, applyFile, session)
 		default:
 			return fmt.Errorf("unknown resource kind %q in %s", resourceType, applyFile)
 		}
 	},
 }
 
-func applyCluster(client *aws.Client, file string) error {
+func applyCluster(client *aws.Client, file string, session *stateSession, clientRegion string) error {
 	cfg, err := config.LoadClusterConfig(file)
 	if err != nil {
 		return err
@@ -57,6 +81,9 @@ func applyCluster(client *aws.Client, file string) error {
 	resolvedRegion := region
 	if resolvedRegion == "" {
 		resolvedRegion = cfg.Region
+	}
+	if resolvedRegion == "" {
+		resolvedRegion = clientRegion
 	}
 
 	exists, err := client.ClusterExists(context.Background(), cfg.Name)
@@ -72,9 +99,9 @@ func applyCluster(client *aws.Client, file string) error {
 		if !changed {
 			fmt.Printf("  Cluster %q is up to date.\n", cfg.Name)
 		}
-		if !applyDryRun {
-			if err := writeClusterState(cfg, resolvedRegion); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: state not updated: %v\n", err)
+		if !applyDryRun && session != nil {
+			if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+				return fmt.Errorf("cluster updated but remote state was not updated: %w", err)
 			}
 		}
 		return nil
@@ -92,13 +119,15 @@ func applyCluster(client *aws.Client, file string) error {
 	}
 	fmt.Printf("✓ Cluster %q created.\n", cfg.Name)
 
-	if err := writeClusterState(cfg, resolvedRegion); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: state not updated: %v\n", err)
+	if session != nil {
+		if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+			return fmt.Errorf("cluster created but remote state was not updated: %w", err)
+		}
 	}
 	return nil
 }
 
-func applyService(client *aws.Client, file string) error {
+func applyService(client *aws.Client, file string, session *stateSession) error {
 	cfg, err := config.LoadServiceConfig(file)
 	if err != nil {
 		return err
@@ -119,12 +148,12 @@ func applyService(client *aws.Client, file string) error {
 		if !changed {
 			fmt.Printf("  No changes required.\n")
 		}
-		if !applyDryRun {
-			if err := writeServiceState(cfg, region); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: state not updated: %v\n", err)
-			}
-		} else {
+		if applyDryRun {
 			fmt.Printf("[dry-run] Would ensure service %q in cluster %q is tracked in state.\n", cfg.Name, cfg.Cluster)
+		} else if session != nil {
+			if err := recordServiceState(session, client, cfg, region); err != nil {
+				return fmt.Errorf("service updated but remote state was not updated: %w", err)
+			}
 		}
 		return nil
 	}
@@ -140,6 +169,11 @@ func applyService(client *aws.Client, file string) error {
 		return err
 	}
 	fmt.Printf("✓ Service %q created.\n", cfg.Name)
+	if session != nil {
+		if err := recordServiceState(session, client, cfg, region); err != nil {
+			return fmt.Errorf("service created but remote state was not updated: %w", err)
+		}
+	}
 
 	if applyWait {
 		fmt.Println("Waiting for service to reach steady state...")
@@ -149,13 +183,10 @@ func applyService(client *aws.Client, file string) error {
 		fmt.Printf("✓ Service %q is stable.\n", cfg.Name)
 	}
 
-	if err := writeServiceState(cfg, region); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: state not updated: %v\n", err)
-	}
 	return nil
 }
 
-func applyExpressService(client *aws.Client, file string) error {
+func applyExpressService(client *aws.Client, file string, session *stateSession) error {
 	cfg, err := config.LoadExpressServiceConfig(file)
 	if err != nil {
 		return err
@@ -182,8 +213,10 @@ func applyExpressService(client *aws.Client, file string) error {
 		if applyDryRun {
 			return nil
 		}
-		if err := writeExpressState(cfg, existingARN, region); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Express service updated but state not updated: %v\n", err)
+		if session != nil {
+			if err := recordExpressState(session, client, cfg, existingARN, region); err != nil {
+				return fmt.Errorf("express service updated but remote state was not updated: %w", err)
+			}
 		}
 		if applyWait {
 			if err := client.WaitForExpressService(context.Background(), existingARN); err != nil {
@@ -205,8 +238,10 @@ func applyExpressService(client *aws.Client, file string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeExpressState(cfg, arn, region); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Express service created but state not updated: %v\n", err)
+	if session != nil {
+		if err := recordExpressState(session, client, cfg, arn, region); err != nil {
+			return fmt.Errorf("express service created but remote state was not updated: %w", err)
+		}
 	}
 	fmt.Printf("✓ Express service %q created (%s).\n", cfg.ServiceName, arn)
 	if applyWait {
