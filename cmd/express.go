@@ -44,7 +44,7 @@ var expressCreateCmd = &cobra.Command{
 		fmt.Printf("Created Express service %q (%s)\n", cfg.ServiceName, arn)
 		if session != nil {
 			if err := recordExpressState(session, client, cfg, arn, region); err != nil {
-				return fmt.Errorf("Express service created but remote state was not updated: %w", err)
+				return fmt.Errorf("express service created but remote state was not updated: %w", err)
 			}
 		}
 		if expressWait {
@@ -86,7 +86,7 @@ var expressUpdateCmd = &cobra.Command{
 		fmt.Printf("Updated Express service %s\n", expressARN)
 		if session != nil {
 			if err := recordExpressState(session, client, cfg, expressARN, region); err != nil {
-				return fmt.Errorf("Express service updated but remote state was not updated: %w", err)
+				return fmt.Errorf("express service updated but remote state was not updated: %w", err)
 			}
 		}
 		if expressWait {

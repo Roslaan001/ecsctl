@@ -215,7 +215,7 @@ func applyExpressService(client *aws.Client, file string, session *stateSession)
 		}
 		if session != nil {
 			if err := recordExpressState(session, client, cfg, existingARN, region); err != nil {
-				return fmt.Errorf("Express service updated but remote state was not updated: %w", err)
+				return fmt.Errorf("express service updated but remote state was not updated: %w", err)
 			}
 		}
 		if applyWait {
@@ -240,7 +240,7 @@ func applyExpressService(client *aws.Client, file string, session *stateSession)
 	}
 	if session != nil {
 		if err := recordExpressState(session, client, cfg, arn, region); err != nil {
-			return fmt.Errorf("Express service created but remote state was not updated: %w", err)
+			return fmt.Errorf("express service created but remote state was not updated: %w", err)
 		}
 	}
 	fmt.Printf("✓ Express service %q created (%s).\n", cfg.ServiceName, arn)
