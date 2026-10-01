@@ -291,6 +291,26 @@ Print the S3 path and all tracked clusters and services inside the current state
 ecsctl state show
 ```
 
+### 5. Check for Drift
+
+Compare saved configurations in the active state context with live ECS resources without changing them:
+
+```bash
+ecsctl state drift
+```
+
+The scan reports drift, resources that are up to date, skipped resources without a saved configuration, and errors. Use `--context` to scan a different state context.
+
+### 6. State Locking
+
+When a state context is active, resource-changing commands hold its S3 lock until the AWS operation and state update finish. If a command leaves a stale lock, confirm that no operation is still running before removing it:
+
+```bash
+ecsctl state unlock --force
+```
+
+See the [Remote State guide](docs/state.md) for context setup, imports, drift checks, and lock recovery.
+
 ---
 
 ## Global Flags
