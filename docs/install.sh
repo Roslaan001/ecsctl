@@ -65,7 +65,7 @@ echo "Selected version: $VERSION"
 
 # Format download URL
 FILENAME="${BINARY}_${VERSION_CLEAN}_${OS}_${ARCH}.tar.gz"
-DOWNLOAD_URL="https://ecsctl.abdulsomad005.workers.dev/bin/$FILENAME"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
 
 # Create a temporary directory for extraction
 TMP_DIR=$(mktemp -d)

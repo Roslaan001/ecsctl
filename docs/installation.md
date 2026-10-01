@@ -11,14 +11,14 @@ Choose the installation method that matches your machine. The installer download
     To download and install the latest precompiled release binary automatically, run:
 
     ```bash
-    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
+    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh
     ```
 
     #### Install a specific version
     To install a tagged release instead of the latest release, pass its tag:
 
     ```bash
-    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh -s -- v0.1.0
+    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh -s -- v0.1.0
     ```
 
     #### Install without administrator access
@@ -33,7 +33,7 @@ Choose the installation method that matches your machine. The installer download
     To download and install the latest precompiled release binary automatically on Windows, run the following command in **PowerShell**:
 
     ```powershell
-    irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
+    irm https://roslaan001.github.io/ecsctl/install.ps1 | iex
     ```
 
     The script automatically:
