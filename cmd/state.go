@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	ecsaws "github.com/roslaan001/ecsctl/pkg/aws"
+	"github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/roslaan001/ecsctl/pkg/localconfig"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"github.com/spf13/cobra"

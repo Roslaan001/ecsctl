@@ -120,7 +120,7 @@ network:
 	}
 }
 
-func TestLoadServiceConfig_Defaults(t *testing.T) {
+func TestLoadServiceConfig_OmittedFields(t *testing.T) {
 	yaml := `
 name: my-service
 cluster: my-cluster
@@ -132,13 +132,12 @@ taskDefinition: my-task:1
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// LaunchType should default to FARGATE
-	if cfg.LaunchType != "FARGATE" {
-		t.Errorf("LaunchType default: got %q, want %q", cfg.LaunchType, "FARGATE")
+	// Omitted fields stay unset so reconciliation does not change live values.
+	if cfg.LaunchType != "" || cfg.LaunchTypeConfigured {
+		t.Errorf("omitted LaunchType: got %q (configured=%t), want unset", cfg.LaunchType, cfg.LaunchTypeConfigured)
 	}
-	// DesiredCount should default to 1
-	if cfg.DesiredCount != 1 {
-		t.Errorf("DesiredCount default: got %d, want 1", cfg.DesiredCount)
+	if cfg.DesiredCount != 0 || cfg.DesiredCountConfigured {
+		t.Errorf("omitted DesiredCount: got %d (configured=%t), want unset", cfg.DesiredCount, cfg.DesiredCountConfigured)
 	}
 	if cfg.SchedulingStrategy != "REPLICA" {
 		t.Errorf("SchedulingStrategy default: got %q, want REPLICA", cfg.SchedulingStrategy)

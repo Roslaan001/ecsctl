@@ -1600,7 +1600,7 @@ func serviceConfigFromAWS(service types.Service) *ecscfg.ServiceConfig {
 		Name: aws.ToString(service.ServiceName), Cluster: clusterNameFromARN(aws.ToString(service.ClusterArn)),
 		TaskDefinition: aws.ToString(service.TaskDefinition), LaunchType: string(service.LaunchType), SchedulingStrategy: scheduling,
 		DesiredCount: service.DesiredCount, HealthCheckGracePeriodSeconds: aws.ToInt32(service.HealthCheckGracePeriodSeconds),
-		DesiredCountConfigured: true, HealthCheckGraceConfigured: true, LaunchTypeConfigured: aws.ToString(service.LaunchType) != "",
+		DesiredCountConfigured: true, HealthCheckGraceConfigured: true, LaunchTypeConfigured: service.LaunchType != "",
 		EnableExecuteCommand: aws.Bool(service.EnableExecuteCommand), EnableECSManagedTags: aws.Bool(service.EnableECSManagedTags),
 		PropagateTags: string(service.PropagateTags), PlatformVersion: aws.ToString(service.PlatformVersion),
 	}
