@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/Roslaan001/ecsctl/compare/v0.1.1...v0.1.2) (2026-10-01)
+
+
+### Bug Fixes
+
+* omit empty task definition tags on deploy ([9597bc1](https://github.com/Roslaan001/ecsctl/commit/9597bc1e75ec32995443639147a97e8597c4835d))
+* omit empty task definition tags on deploy ([a529d23](https://github.com/Roslaan001/ecsctl/commit/a529d2372516b4373b5ada52da2e1b72bb6e1743))
+
 ## [0.1.1](https://github.com/Roslaan001/ecsctl/compare/v0.1.0...v0.1.1) (2026-10-01)
 
 
