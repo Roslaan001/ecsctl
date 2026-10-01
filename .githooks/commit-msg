@@ -7,5 +7,5 @@ if [[ -f "$merge_head" ]]; then
 fi
 
 message_file="${1:?commit message file is required}"
-subject="$(sed -n '1p' "$message_file")"
-bash scripts/validate-commit-subject.sh "$subject"
+message="$(cat "$message_file")"
+bash scripts/validate-commit-message.sh "$message"

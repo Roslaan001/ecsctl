@@ -21,10 +21,11 @@ mapfile -t commits <<< "$commit_list"
 failed=0
 for commit in "${commits[@]}"; do
 	subject="$(git show -s --format=%s "$commit")"
-	if bash scripts/validate-commit-subject.sh "$subject"; then
+	message="$(git show -s --format=%B "$commit")"
+	if bash scripts/validate-commit-message.sh "$message"; then
 		printf 'Valid: %s %s\n' "${commit:0:7}" "$subject"
 	else
-		printf 'Commit %s has an invalid subject.\n' "${commit:0:7}" >&2
+		printf 'Commit %s has an invalid message.\n' "${commit:0:7}" >&2
 		failed=1
 	fi
 done
