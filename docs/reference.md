@@ -246,7 +246,13 @@ ecsctl completion fish
 ecsctl completion powershell
 ```
 
-Use `ecsctl help COMMAND` or `ecsctl COMMAND --help` to see command-specific usage.
+For help with a specific command or its flags, run:
+
+```text
+ecsctl --help
+ecsctl create service --help
+ecsctl help state import
+```
 
 ## `version`
 
