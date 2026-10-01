@@ -198,12 +198,28 @@ If you want to quickly spin up a resource without writing a YAML file, pass the 
 
 ```bash
 # Create a cluster using flags
+ecsctl create cluster --name my-cluster --region us-east-1
+ecsctl create cluster --name my-ec2-cluster --region us-east-1 --ec2
+
+# Add Fargate Spot explicitly
 ecsctl create cluster --name my-cluster --region us-east-1 --capacity-providers FARGATE,FARGATE_SPOT
 
 # Create a service using flags
 ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3 \
   --subnets subnet-abc123 --security-groups sg-abc123
 ```
+
+Without `--ec2`, `create cluster` attaches `FARGATE` and uses it as the default
+capacity-provider strategy. With `--ec2`, ecsctl uses public subnets in the
+region's default VPC, an ECS-optimized Amazon Linux 2023 image, a `t3.small`
+instance, and an EC2 Auto Scaling capacity provider. It launches one instance by
+default; `--ec2-instance-type` and `--ec2-count` override these defaults. The
+EC2-backed cluster keeps Fargate attached as an option but defaults workloads to
+EC2. Creating and running EC2 instances incurs AWS charges.
+
+If you provide a custom Fargate provider list, ecsctl uses `FARGATE` as the
+strategy only when it appears in that list; set
+`defaultCapacityProviderStrategy` in YAML to choose another default.
 
 
 ---

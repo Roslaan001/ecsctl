@@ -42,7 +42,7 @@ ecsctl
 ├── exec             - Open interactive shell or run commands in container task
 ├── express          - Create, update, inspect, and delete ECS Express Mode services
 ├── register         - Register a task definition from ECS JSON
-├── run-task         - Run one-off Fargate tasks
+├── run-task         - Run one-off ECS tasks
 ├── stop-task        - Stop a running task
 ├── state            - Manage remote state backend contexts
 │   ├── init
@@ -76,6 +76,9 @@ Create a new ECS resource and fail if it already exists. Clusters and regular EC
       * `--name` (string): Cluster name (required if `-f` is omitted).
       * `--region` (string): AWS region.
       * `--capacity-providers` (string slice): Capacity providers, e.g., `FARGATE,FARGATE_SPOT`.
+      * `--ec2` (boolean): Create an EC2-backed cluster in the default VPC.
+      * `--ec2-instance-type` (string): EC2 instance type used with `--ec2` (defaults to `t3.small`).
+      * `--ec2-count` (int): Initial EC2 instance count used with `--ec2` (defaults to 1).
       * `--tags` (string array): Tags as `key=value` pairs.
   * `create service`: Create an ECS service.
     * **Flags**:
@@ -83,7 +86,7 @@ Create a new ECS resource and fail if it already exists. Clusters and regular EC
       * `--name` (string): Service name (required if `-f` is omitted).
       * `--cluster` (string): Cluster name (required if `-f` is omitted).
       * `--task-definition` (string): Task definition family:revision (required if `-f` is omitted).
-      * `--launch-type` (string): `FARGATE` or `EC2` (defaults to `FARGATE`).
+      * `--launch-type` (string): `FARGATE` or `EC2` (defaults to the cluster capacity-provider strategy).
       * `--desired-count` (int): Number of tasks to run (defaults to 1).
       * `--subnets` (string slice): Subnet IDs.
       * `--security-groups` (string slice): Security Group IDs.
@@ -163,7 +166,7 @@ Manage ECS Express Mode web services; see [Express Mode guide](express.md).
 
 ### Task definitions and one-off tasks
 * `register task-definition -f FILE`: Register an ECS task definition JSON document.
-* `run-task --cluster CLUSTER --task-definition FAMILY:REV`: Start standalone Fargate tasks; supports `--count`, `--subnets`, `--security-groups`, and `--assign-public-ip`.
+* `run-task --cluster CLUSTER --task-definition FAMILY:REV`: Start standalone ECS tasks; supports `--count`, `--launch-type`, `--subnets`, `--security-groups`, and `--assign-public-ip`. By default, ECS uses the cluster's capacity-provider strategy.
 * `stop-task --cluster CLUSTER --task TASK_ID_OR_ARN`: Stop a running task.
 
 ### `state`

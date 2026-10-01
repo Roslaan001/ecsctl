@@ -13,6 +13,7 @@ import (
 
 var taskDefinitionFile, runTaskCluster, runTaskDefinition, runTaskPublicIP, stopTaskCluster, stopTaskARN, stopTaskReason string
 var runTaskCount int32
+var runTaskLaunchType string
 var runTaskSubnets, runTaskSecurityGroups []string
 
 var registerTaskDefinitionCmd = &cobra.Command{Use: "task-definition", Short: "Register an ECS task definition from ECS JSON", Example: "ecsctl register task-definition -f task-definition.json", RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,7 +47,7 @@ var runTaskCmd = &cobra.Command{Use: "run-task", Short: "Run one-off ECS tasks",
 	if err != nil {
 		return err
 	}
-	arns, err := client.RunTask(context.Background(), aws.RunTaskOptions{Cluster: runTaskCluster, TaskDefinition: runTaskDefinition, Count: runTaskCount, Subnets: runTaskSubnets, SecurityGroups: runTaskSecurityGroups, AssignPublicIP: runTaskPublicIP})
+	arns, err := client.RunTask(context.Background(), aws.RunTaskOptions{Cluster: runTaskCluster, TaskDefinition: runTaskDefinition, Count: runTaskCount, LaunchType: runTaskLaunchType, Subnets: runTaskSubnets, SecurityGroups: runTaskSecurityGroups, AssignPublicIP: runTaskPublicIP})
 	if err != nil {
 		return err
 	}
@@ -80,6 +81,7 @@ func init() {
 	runTaskCmd.Flags().StringVar(&runTaskCluster, "cluster", "", "Cluster name (required)")
 	runTaskCmd.Flags().StringVar(&runTaskDefinition, "task-definition", "", "Task definition family:revision or ARN (required)")
 	runTaskCmd.Flags().Int32Var(&runTaskCount, "count", 1, "Number of tasks to start")
+	runTaskCmd.Flags().StringVar(&runTaskLaunchType, "launch-type", "", "Launch type: FARGATE or EC2 (defaults to the cluster capacity-provider strategy)")
 	runTaskCmd.Flags().StringSliceVar(&runTaskSubnets, "subnets", nil, "VPC subnet IDs")
 	runTaskCmd.Flags().StringSliceVar(&runTaskSecurityGroups, "security-groups", nil, "VPC security group IDs")
 	runTaskCmd.Flags().StringVar(&runTaskPublicIP, "assign-public-ip", "DISABLED", "Assign a public IP: ENABLED or DISABLED")
