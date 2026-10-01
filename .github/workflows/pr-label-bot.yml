@@ -1,0 +1,62 @@
+name: ECSCTL PR Bot
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  commit-message-label:
+    name: Manage invalid commit message label
+    runs-on: ubuntu-latest
+    steps:
+      # pull_request_target runs against the base branch. Only check out this
+      # trusted revision; never check out or execute code from the PR branch.
+      - name: Check out trusted validator
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Apply or clear label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ecsctl/invalid-commit-message
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid pull request number." >&2
+            exit 1
+          fi
+
+          commits_endpoint="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits"
+          messages="$(gh api --paginate "$commits_endpoint" --jq '.[].commit.message | @base64')"
+          invalid=false
+
+          while IFS= read -r encoded_message; do
+            [[ -z "$encoded_message" ]] && continue
+            message="$(printf '%s' "$encoded_message" | base64 --decode)"
+            if ! bash scripts/validate-commit-message.sh "$message"; then
+              invalid=true
+            fi
+          done <<< "$messages"
+
+          labels_endpoint="repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels"
+          if [[ "$invalid" == true ]]; then
+            gh api --method POST "$labels_endpoint" -f "labels[]=$LABEL" >/dev/null
+            echo "Applied $LABEL to pull request #$PR_NUMBER."
+          else
+            existing_labels="$(gh api --paginate "$labels_endpoint" --jq '.[].name')"
+            if printf '%s\n' "$existing_labels" | grep -Fxq "$LABEL"; then
+              gh api --method DELETE "${labels_endpoint}/ecsctl%2Finvalid-commit-message" --silent
+              echo "Removed $LABEL from pull request #$PR_NUMBER."
+            else
+              echo "No invalid commit message label to clear."
+            fi
+          fi
