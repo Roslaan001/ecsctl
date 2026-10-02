@@ -6,6 +6,10 @@
 # Usage (PowerShell):
 #   irm https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.ps1 | iex
 
+param(
+    [string]$Version
+)
+
 $ErrorActionPreference = 'Stop'
 
 $Repo = "Roslaan001/ecsctl"
@@ -31,11 +35,13 @@ if ([string]::IsNullOrEmpty($Version)) {
         $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -Headers @{"User-Agent"="ecsctl-installer"} -UseBasicParsing
         $Version = $ReleaseInfo.tag_name
     } catch {
-        $Version = "v0.0.1"
+        Write-Error "Could not resolve the latest release. Check your network or run the script with -Version vX.Y.Z."
+        Exit 1
     }
 }
 if ([string]::IsNullOrEmpty($Version) -or $Version -eq "null") {
-    $Version = "v0.0.1"
+    Write-Error "GitHub did not return a latest release tag. Run the script with -Version vX.Y.Z."
+    Exit 1
 }
 
 $VersionClean = $Version.TrimStart('v')

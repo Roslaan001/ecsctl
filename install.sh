@@ -6,7 +6,7 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
 #   or specify a version:
-#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.2.1
 
 set -e
 
@@ -46,16 +46,26 @@ if [ -z "$VERSION" ]; then
     echo "Resolving the latest release version for $REPO..."
     LATEST_RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
     
-    # Try fetching using curl or wget with User-Agent header
+    RELEASE_INFO=""
     if command -v curl >/dev/null 2>&1; then
-        VERSION=$(curl -sH "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(curl -fsSL -H "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
     elif command -v wget >/dev/null 2>&1; then
-        VERSION=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
+    else
+        echo "Error: curl or wget is required to resolve the latest release." >&2
+        exit 1
     fi
-    
-    # Fallback to latest known version if repo is private or API limit hit
+
+    VERSION=$(printf '%s\n' "$RELEASE_INFO" | sed -nE 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        VERSION="v0.0.1"
+        echo "Error: GitHub did not return a latest release tag. Pass a version tag explicitly." >&2
+        exit 1
     fi
 fi
 
@@ -98,26 +108,30 @@ fi
 # Determine target directory
 # Default to /usr/local/bin, fallback to $HOME/.local/bin if not root and /usr/local/bin not writable.
 TARGET_DIR="/usr/local/bin"
-USE_SUDO=""
+INSTALLED=0
 
-if [ ! -w "$TARGET_DIR" ]; then
-    if [ "$(id -u)" -ne 0 ]; then
-        if command -v sudo >/dev/null 2>&1; then
-            echo "Installing to $TARGET_DIR (requires sudo)..."
-            USE_SUDO="sudo"
-        else
-            TARGET_DIR="$HOME/.local/bin"
-            echo "Installing to $TARGET_DIR (no sudo available)..."
-            mkdir -p "$TARGET_DIR"
+if [ -w "$TARGET_DIR" ]; then
+    echo "Installing to $TARGET_DIR..."
+    cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
+    chmod +x "$TARGET_DIR/$BINARY"
+    INSTALLED=1
+else
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        echo "Installing to $TARGET_DIR (requires sudo)..."
+        if sudo cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY" 2>/dev/null && sudo chmod +x "$TARGET_DIR/$BINARY" 2>/dev/null; then
+            INSTALLED=1
         fi
     fi
-else
-    echo "Installing to $TARGET_DIR..."
-fi
 
-# Copy binary to target directory
-$USE_SUDO cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
-$USE_SUDO chmod +x "$TARGET_DIR/$BINARY"
+    if [ "$INSTALLED" -eq 0 ]; then
+        TARGET_DIR="$HOME/.local/bin"
+        echo "Installing to $TARGET_DIR (no sudo required)..."
+        mkdir -p "$TARGET_DIR"
+        cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
+        chmod +x "$TARGET_DIR/$BINARY"
+        INSTALLED=1
+    fi
+fi
 
 echo "Successfully installed ecsctl to $TARGET_DIR/$BINARY"
 echo "Tip: Run 'ecsctl completion [bash|zsh|fish]' to set up shell autocompletions!"

@@ -6,7 +6,7 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
 #   or specify a version:
-#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.2.1
 
 set -e
 
@@ -46,16 +46,26 @@ if [ -z "$VERSION" ]; then
     echo "Resolving the latest release version for $REPO..."
     LATEST_RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
     
-    # Try fetching using curl or wget with User-Agent header
+    RELEASE_INFO=""
     if command -v curl >/dev/null 2>&1; then
-        VERSION=$(curl -sH "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(curl -fsSL -H "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
     elif command -v wget >/dev/null 2>&1; then
-        VERSION=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
+    else
+        echo "Error: curl or wget is required to resolve the latest release." >&2
+        exit 1
     fi
-    
-    # Fallback to latest known version if repo is private or API limit hit
+
+    VERSION=$(printf '%s\n' "$RELEASE_INFO" | sed -nE 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        VERSION="v0.0.1"
+        echo "Error: GitHub did not return a latest release tag. Pass a version tag explicitly." >&2
+        exit 1
     fi
 fi
 
@@ -97,7 +107,6 @@ fi
 
 # Determine target directory
 # Default to /usr/local/bin, fallback to $HOME/.local/bin if not root and /usr/local/bin not writable.
-# Determine target directory and perform installation
 TARGET_DIR="/usr/local/bin"
 INSTALLED=0
 

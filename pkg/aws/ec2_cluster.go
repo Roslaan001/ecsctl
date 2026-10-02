@@ -112,6 +112,10 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 	if _, err := c.iam.AddRoleToInstanceProfile(ctx, &iam.AddRoleToInstanceProfileInput{InstanceProfileName: awssdk.String(names.profile), RoleName: awssdk.String(names.role)}); err != nil {
 		return fmt.Errorf("adding ECS role to instance profile: %w", err)
 	}
+	profile, err := c.waitForEC2InstanceProfile(ctx, names.profile, names.role)
+	if err != nil {
+		return err
+	}
 
 	userData := fmt.Sprintf("#!/bin/bash\necho ECS_CLUSTER=%q >> /etc/ecs/ecs.config\necho ECS_LOGLEVEL=info >> /etc/ecs/ecs.config\n", cfg.Name)
 	ltOut, err := c.ec2.CreateLaunchTemplate(ctx, &ec2.CreateLaunchTemplateInput{
@@ -121,7 +125,7 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 			ImageId:      awssdk.String(ami),
 			InstanceType: ec2Types.InstanceType(instanceType),
 			IamInstanceProfile: &ec2Types.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: awssdk.String(names.profile),
+				Arn: profile.Arn,
 			},
 			UserData: awssdk.String(base64.StdEncoding.EncodeToString([]byte(userData))),
 			NetworkInterfaces: []ec2Types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest{{
@@ -145,7 +149,7 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 	if maximum < 3 {
 		maximum = 3
 	}
-	if _, err := c.awsScaling.CreateAutoScalingGroup(ctx, &autoscaling.CreateAutoScalingGroupInput{
+	asgInput := &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: awssdk.String(names.autoScalingGroup),
 		MinSize:              awssdk.Int32(0),
 		MaxSize:              awssdk.Int32(maximum),
@@ -162,7 +166,8 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 			Key: awssdk.String("ecsctl:cluster"), Value: awssdk.String(cfg.Name),
 			ResourceId: awssdk.String(names.autoScalingGroup), ResourceType: awssdk.String("auto-scaling-group"), PropagateAtLaunch: awssdk.Bool(true),
 		}},
-	}); err != nil {
+	}
+	if err := c.createEC2AutoScalingGroup(ctx, asgInput); err != nil {
 		return fmt.Errorf("creating ECS EC2 Auto Scaling group in VPC %s: %w", vpcID, err)
 	}
 	groupCreated = true
@@ -174,7 +179,7 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 		}
 		return fmt.Errorf("ECS EC2 Auto Scaling group %q has no ARN", names.autoScalingGroup)
 	}
-	_, err = c.ecs.CreateCapacityProvider(ctx, &ecs.CreateCapacityProviderInput{
+	capacityProviderInput := &ecs.CreateCapacityProviderInput{
 		Name: awssdk.String(names.capacityProvider),
 		AutoScalingGroupProvider: &ecsTypes.AutoScalingGroupProvider{
 			AutoScalingGroupArn:          groupOut.AutoScalingGroups[0].AutoScalingGroupARN,
@@ -185,8 +190,11 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 				MinimumScalingStepSize: awssdk.Int32(1), MaximumScalingStepSize: awssdk.Int32(3), InstanceWarmupPeriod: awssdk.Int32(300),
 			},
 		},
-		Tags: toECSTags(cfg.Tags),
-	})
+	}
+	if len(cfg.Tags) > 0 {
+		capacityProviderInput.Tags = toECSTags(cfg.Tags)
+	}
+	_, err = c.ecs.CreateCapacityProvider(ctx, capacityProviderInput)
 	if err != nil {
 		return fmt.Errorf("creating ECS EC2 capacity provider: %w", err)
 	}
@@ -208,6 +216,43 @@ func (c *Client) CreateEC2Cluster(ctx context.Context, cfg *ecscfg.ClusterConfig
 		return err
 	}
 	return nil
+}
+
+func (c *Client) createEC2AutoScalingGroup(ctx context.Context, input *autoscaling.CreateAutoScalingGroupInput) error {
+	deadline := time.NewTimer(2 * time.Minute)
+	defer deadline.Stop()
+	backoff := 2 * time.Second
+	for {
+		_, err := c.awsScaling.CreateAutoScalingGroup(ctx, input)
+		if err == nil {
+			return nil
+		}
+		if !isIAMInstanceProfilePropagationError(err) {
+			return err
+		}
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-deadline.C:
+			timer.Stop()
+			return fmt.Errorf("IAM instance profile is still not visible to EC2 Auto Scaling after 2 minutes: %w", err)
+		case <-timer.C:
+		}
+		if backoff < 20*time.Second {
+			backoff *= 2
+		}
+	}
+}
+
+func isIAMInstanceProfilePropagationError(err error) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) || apiErr.ErrorCode() != "ValidationError" {
+		return false
+	}
+	message := apiErr.ErrorMessage()
+	return strings.Contains(message, "Invalid IAM Instance Profile name") || strings.Contains(message, "Invalid IAM Instance Profile ARN")
 }
 
 func (c *Client) waitForCapacityProvider(ctx context.Context, providerName string) error {
@@ -283,6 +328,32 @@ func (c *Client) ecsOptimizedAMI(ctx context.Context) (string, error) {
 	return awssdk.ToString(out.Parameter.Value), nil
 }
 
+func (c *Client) waitForEC2InstanceProfile(ctx context.Context, profileName, roleName string) (*iamTypes.InstanceProfile, error) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	deadline := time.NewTimer(2 * time.Minute)
+	defer deadline.Stop()
+	for {
+		out, err := c.iam.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{InstanceProfileName: awssdk.String(profileName)})
+		if err == nil && out.InstanceProfile != nil {
+			for _, role := range out.InstanceProfile.Roles {
+				if awssdk.ToString(role.RoleName) == roleName && awssdk.ToString(out.InstanceProfile.Arn) != "" {
+					return out.InstanceProfile, nil
+				}
+			}
+		} else if err != nil && !isIAMMissing(err) {
+			return nil, fmt.Errorf("checking ECS EC2 instance profile: %w", err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-deadline.C:
+			return nil, fmt.Errorf("timed out waiting for role %q to appear in ECS EC2 instance profile %q", roleName, profileName)
+		case <-ticker.C:
+		}
+	}
+}
+
 func (c *Client) waitForEC2ContainerInstances(ctx context.Context, clusterName string, count int32) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -316,13 +387,13 @@ func namesForEC2Cluster(clusterName string) ec2ClusterNames {
 		}
 	}
 	base := strings.Trim(safe.String(), "-")
-	if len(base) > 30 {
-		base = base[:30]
+	if len(base) > 24 {
+		base = base[:24]
 	}
 	hash := sha256.Sum256([]byte(clusterName))
 	prefix := fmt.Sprintf("ecsctl-%s-%s", base, hex.EncodeToString(hash[:4]))
 	return ec2ClusterNames{
-		capacityProvider: prefix + "-ec2",
+		capacityProvider: fmt.Sprintf("managed-ecsctl-%s-%s-ec2", base, hex.EncodeToString(hash[:4])),
 		launchTemplate:   prefix + "-lt",
 		autoScalingGroup: prefix + "-asg",
 		role:             prefix + "-instance-role",
