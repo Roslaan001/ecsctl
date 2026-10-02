@@ -335,7 +335,7 @@ The following flags can be passed to any subcommand to override default configur
 
 ## Build & Test
 
-`make test-floci` uses dummy `test` credentials and a local Floci endpoint; it does not need an AWS account or real AWS keys. The current Floci ECS API does not list the Express Gateway operations, so Floci covers the standard ECS service lifecycle. A manually dispatched [AWS Express smoke workflow](.github/workflows/express-aws-smoke.yml) creates, waits for, describes, and deletes a one-task service. It requires the `AWS_SMOKE_ROLE_ARN` GitHub secret configured for OIDC, plus an existing test cluster and ECS infrastructure/execution roles. See the [Floci ECS support matrix](https://floci.io/floci/services/ecs/).
+`make test-floci` uses dummy `test` credentials and a local Floci endpoint; it does not need an AWS account or real AWS keys. The current Floci ECS API does not list the Express Gateway operations, so Floci covers the standard ECS service lifecycle. A manually dispatched [AWS Express smoke workflow](.github/workflows/express-aws-smoke.yml) creates, waits for, describes, and deletes a one-task service. It uses GitHub OIDC through the `AWS_SMOKE_ROLE_ARN` secret, verifies the expected AWS account before creating resources, and requires ECS infrastructure/execution roles; leave the cluster input blank to create and remove a temporary cluster. See the [Floci ECS support matrix](https://floci.io/floci/services/ecs/).
 
 ```bash
 make build     # builds binary to ./bin/ecsctl
