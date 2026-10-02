@@ -62,7 +62,7 @@ if [ -z "$VERSION" ]; then
         exit 1
     fi
 
-    VERSION=$(printf '%s\n' "$RELEASE_INFO" | sed -nE 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
+    VERSION=$(printf '%s\n' "$RELEASE_INFO" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
         echo "Error: GitHub did not return a latest release tag. Pass a version tag explicitly." >&2
         exit 1
