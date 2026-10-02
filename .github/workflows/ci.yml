@@ -124,3 +124,32 @@ jobs:
           AWS_SECRET_ACCESS_KEY: test
           AWS_EC2_METADATA_DISABLED: "true"
         run: go test -tags=integration ./pkg/aws -run '^TestFlociECSServiceLifecycle$' -count=1 -v
+
+  installer-smoke:
+    name: Installer smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Install and run the latest release (macOS/Linux)
+        if: runner.os != 'Windows'
+        env:
+          ECSCTL_INSTALL_DIR: ${{ runner.temp }}/ecsctl-bin
+        run: |
+          sh ./install.sh
+          "$ECSCTL_INSTALL_DIR/ecsctl" version
+
+      - name: Install and run the latest release (Windows)
+        if: runner.os == 'Windows'
+        env:
+          ECSCTL_INSTALL_DIR: ${{ runner.temp }}/ecsctl-bin
+        shell: pwsh
+        run: |
+          ./install.ps1
+          & (Join-Path $env:ECSCTL_INSTALL_DIR 'ecsctl.exe') version
