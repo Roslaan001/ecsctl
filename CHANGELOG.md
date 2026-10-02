@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Roslaan001/ecsctl/compare/v0.2.0...v0.2.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **ec2:** make cluster creation reliable ([#18](https://github.com/Roslaan001/ecsctl/issues/18)) ([7a1a317](https://github.com/Roslaan001/ecsctl/commit/7a1a31790a24edb873cd7d717e1900b0e43cc62c))
+
 ## [0.2.0](https://github.com/Roslaan001/ecsctl/compare/v0.1.2...v0.2.0) (2026-10-01)
 
 
