@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/Roslaan001/ecsctl/compare/v0.2.2...v0.2.3) (2026-10-02)
+
+
+### Bug Fixes
+
+* **security:** harden release and smoke checks ([#24](https://github.com/Roslaan001/ecsctl/issues/24)) ([c7a0f1f](https://github.com/Roslaan001/ecsctl/commit/c7a0f1f8b71e5546fee1a957a60f1772a70c138d))
+
 ## [0.2.2](https://github.com/Roslaan001/ecsctl/compare/v0.2.1...v0.2.2) (2026-10-02)
 
 
