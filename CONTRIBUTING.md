@@ -47,3 +47,14 @@ go test -tags=integration ./pkg/aws -run '^TestAWSEC2ClusterLifecycle$' -count=1
 ```
 
 The test verifies the caller account, active cluster and capacity provider, default EC2 capacity strategy, and registered instance. It fails closed when the profile, expected account, or smoke-test gate is missing. If cleanup reports an error, inspect ECS, EC2 Auto Scaling, launch templates, and the `ecsctl:cluster` IAM resources for leftovers.
+
+The live Fargate smoke test runs one short-lived task in a temporary cluster, checks its Fargate launch type and successful exit, then deregisters its task definition and deletes the cluster. It uses the default VPC's public subnets and security group, so the task must be able to reach the public image registry. A task execution role ARN can be supplied if the account requires one:
+
+```bash
+AWS_PROFILE=test \
+ECSCTL_AWS_FARGATE_EXPECTED_ACCOUNT=123456789012 \
+ECSCTL_AWS_FARGATE_SMOKE=1 \
+go test -tags=integration ./pkg/aws -run '^TestAWSFargateTaskLifecycle$' -count=1 -v
+```
+
+Set `ECSCTL_AWS_FARGATE_IMAGE` to use another public image or `ECSCTL_AWS_FARGATE_EXECUTION_ROLE_ARN` when required. This smoke test creates billable Fargate task runtime and cleans up its ECS resources.

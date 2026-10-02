@@ -1,6 +1,6 @@
 # Installation
 
-Choose the installation method that matches your machine. The installer downloads a prebuilt binary; `go install` and building from source require Go.
+Choose the installation method that matches your machine. The installer downloads a prebuilt binary and verifies it against the release's SHA-256 checksums; `go install` and building from source require Go.
 
 ---
 
@@ -19,6 +19,13 @@ Choose the installation method that matches your machine. The installer download
 
     ```bash
     curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh -s -- v0.2.1
+    ```
+
+    Set `ECSCTL_INSTALL_DIR` to choose an install directory. This is useful for
+    CI and isolated installs; for example:
+
+    ```bash
+    ECSCTL_INSTALL_DIR="$HOME/.local/bin" sh install.sh
     ```
 
     #### Install without administrator access
