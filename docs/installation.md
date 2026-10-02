@@ -56,6 +56,19 @@ After installing, open a new terminal if your `PATH` changed and confirm the com
 ecsctl version
 ```
 
+## Verify release provenance
+
+Starting with v0.2.3, release archives include a GitHub artifact attestation
+that links each archive to the repository and workflow that built it. After
+downloading an archive, verify its provenance with the GitHub CLI:
+
+```bash
+gh attestation verify ecsctl_0.2.3_linux_amd64.tar.gz --repo Roslaan001/ecsctl
+```
+
+Replace the example filename with the archive for your operating system and
+architecture. The installer also checks the archive's SHA-256 checksum.
+
 
 ---
 

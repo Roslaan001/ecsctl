@@ -7,9 +7,13 @@ on:
         description: AWS region with ECS Express Mode enabled
         required: true
         type: string
-      cluster:
-        description: Existing ECS cluster for the temporary smoke service
+      expected_account:
+        description: AWS account ID that the workflow is allowed to modify
         required: true
+        type: string
+      cluster:
+        description: Optional existing ECS cluster; leave blank to create and remove a temporary cluster
+        required: false
         type: string
       infrastructure_role_arn:
         description: ECS infrastructure role ARN
@@ -21,7 +25,8 @@ on:
         type: string
       image:
         description: Container image accessible to ECS
-        required: true
+        required: false
+        default: public.ecr.aws/docker/library/nginx:stable
         type: string
       subnets:
         description: Optional comma-separated subnet IDs
@@ -62,6 +67,7 @@ jobs:
         env:
           AWS_REGION: ${{ inputs.aws_region }}
           ECSCTL_AWS_EXPRESS_SMOKE: "1"
+          ECSCTL_AWS_EXPRESS_EXPECTED_ACCOUNT: ${{ inputs.expected_account }}
           ECSCTL_AWS_EXPRESS_CLUSTER: ${{ inputs.cluster }}
           ECSCTL_AWS_EXPRESS_INFRASTRUCTURE_ROLE_ARN: ${{ inputs.infrastructure_role_arn }}
           ECSCTL_AWS_EXPRESS_EXECUTION_ROLE_ARN: ${{ inputs.execution_role_arn }}
