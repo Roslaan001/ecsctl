@@ -21,7 +21,7 @@ func TestNamesForEC2ClusterCapacityProviderIsValid(t *testing.T) {
 			}
 		}
 		for _, r := range names.capacityProvider {
-			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			if !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-", r) {
 				t.Errorf("capacity provider %q contains invalid character %q", names.capacityProvider, r)
 			}
 		}
