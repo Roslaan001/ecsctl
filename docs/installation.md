@@ -18,7 +18,7 @@ Choose the installation method that matches your machine. The installer download
     To install a tagged release instead of the latest release, pass its tag:
 
     ```bash
-    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh -s -- v0.1.0
+    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh -s -- v0.2.1
     ```
 
     #### Install without administrator access

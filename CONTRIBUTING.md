@@ -25,6 +25,25 @@ git config core.hooksPath .githooks
 
 ## Pull requests
 
-Use the pull request template to describe the change, the validation performed, documentation updates, and operational impact. Changes are routed to the project maintainer listed in `.github/CODEOWNERS`. The existing GitHub Actions workflows run the build and tests, lint, vulnerability scan, supported-platform builds, documentation checks, and Workers deployment checks.
+Use the pull request template to describe the change, the validation performed, documentation updates, and operational impact. Changes are routed to the project maintainer listed in `.github/CODEOWNERS`. The existing GitHub Actions workflows run the build and tests, lint, vulnerability scan, supported-platform builds, documentation checks, and GitHub Pages deployment.
 
 To make these checks block merges, configure the repository's `main` branch rules to require the `Commit messages / Validate commit messages` check along with the required CI and documentation checks. GitHub repository settings are managed separately from the workflow files.
+
+## Tests
+
+Run the unit suite with:
+
+```bash
+go test ./...
+```
+
+The live EC2 cluster smoke test is opt-in. It creates a temporary ECS cluster, one `t3.small` instance, an Auto Scaling group, and an IAM instance role in the default VPC, then removes those resources during cleanup. EC2 charges apply while the instance is running. Set the expected 12-digit account ID before enabling the test:
+
+```bash
+AWS_PROFILE=test \
+ECSCTL_AWS_EC2_EXPECTED_ACCOUNT=123456789012 \
+ECSCTL_AWS_EC2_SMOKE=1 \
+go test -tags=integration ./pkg/aws -run '^TestAWSEC2ClusterLifecycle$' -count=1 -v
+```
+
+The test verifies the caller account, active cluster and capacity provider, default EC2 capacity strategy, and registered instance. It fails closed when the profile, expected account, or smoke-test gate is missing. If cleanup reports an error, inspect ECS, EC2 Auto Scaling, launch templates, and the `ecsctl:cluster` IAM resources for leftovers.
