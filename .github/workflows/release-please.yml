@@ -10,6 +10,8 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  attestations: write
+  id-token: write
 
 jobs:
   release-please:
@@ -51,3 +53,12 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attest release artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            dist/ecsctl_*.tar.gz
+            dist/ecsctl_*.zip
+            dist/checksums.txt

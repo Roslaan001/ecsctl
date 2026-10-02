@@ -27,6 +27,9 @@ var (
 	createClusterName              string
 	createClusterRegion            string
 	createClusterCapacityProviders []string
+	createClusterEC2               bool
+	createClusterEC2InstanceType   string
+	createClusterEC2Count          int32
 	createClusterTags              []string // key=value pairs
 )
 
@@ -39,8 +42,12 @@ var createClusterCmd = &cobra.Command{
 
   # Inline flags
   ecsctl create cluster --name my-cluster --region eu-west-2
-  ecsctl create cluster --name my-cluster --region eu-west-2 --capacity-providers FARGATE,FARGATE_SPOT`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+  ecsctl create cluster --name my-cluster --region eu-west-2 --ec2
+
+Without --ec2, new clusters default to FARGATE. With --ec2, ecsctl creates an
+EC2-backed cluster using the default VPC, t3.small instances, and an Auto Scaling
+capacity provider. Override the instance type or count with the corresponding flags.`,
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		var cfg *config.ClusterConfig
 		var err error
 
@@ -68,23 +75,54 @@ var createClusterCmd = &cobra.Command{
 		if resolvedRegion == "" {
 			resolvedRegion = cfg.Region
 		}
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+		}
 
 		client, err := aws.NewECSClient(context.Background(), resolvedRegion, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
+		if resolvedRegion == "" {
+			resolvedRegion = client.Region()
+		}
 
-		fmt.Printf("Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
-		if err := client.CreateCluster(context.Background(), cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+		if createClusterEC2 && (len(cfg.CapacityProviders) > 0 || len(cfg.DefaultCapacityProviderStrategy) > 0 || cmd.Flags().Changed("capacity-providers")) {
+			return fmt.Errorf("--ec2 configures its own EC2 capacity provider; remove custom capacity-provider settings")
+		}
+		if !createClusterEC2 && (cmd.Flags().Changed("ec2-instance-type") || cmd.Flags().Changed("ec2-count")) {
+			return fmt.Errorf("--ec2-instance-type and --ec2-count require --ec2")
+		}
+		if createClusterEC2 && createClusterEC2Count < 1 {
+			return fmt.Errorf("--ec2-count must be at least 1")
+		}
+		if createClusterEC2 {
+			fmt.Printf("Creating EC2-backed cluster %q in %s (instance type %s, count %d)...\n", cfg.Name, resolvedRegion, createClusterEC2InstanceType, createClusterEC2Count)
+		} else {
+			fmt.Printf("Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
+		}
+		var createErr error
+		if createClusterEC2 {
+			createErr = client.CreateEC2Cluster(context.Background(), cfg, createClusterEC2InstanceType, createClusterEC2Count)
+		} else {
+			createErr = client.CreateCluster(context.Background(), cfg)
+		}
+		if createErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", createErr)
+			return createErr
 		}
 
 		fmt.Printf("✓ Cluster %q created successfully.\n", cfg.Name)
 
 		// Write to remote state if a context is configured
-		if err := writeClusterState(cfg, resolvedRegion); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: cluster created but state not updated: %v\n", err)
+		if session != nil {
+			if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+				return fmt.Errorf("cluster created but remote state was not updated: %w", err)
+			}
 		}
 
 		return nil
@@ -117,7 +155,7 @@ var createServiceCmd = &cobra.Command{
   # Inline flags
   ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3 \
     --subnets subnet-abc123 --security-groups sg-abc123`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		var cfg *config.ServiceConfig
 		var err error
 
@@ -170,6 +208,13 @@ var createServiceCmd = &cobra.Command{
 				}
 			}
 		}
+		session, err := beginStateSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("locking remote state: %w", err)
+		}
+		if session != nil {
+			defer closeStateSessionOnReturn(session, &runErr, "releasing remote state lock")
+		}
 
 		client, err := aws.NewECSClient(context.Background(), region, profile)
 		if err != nil {
@@ -183,6 +228,11 @@ var createServiceCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Service %q created successfully.\n", cfg.Name)
+		if session != nil {
+			if err := recordServiceState(session, client, cfg, region); err != nil {
+				return fmt.Errorf("service created but remote state was not updated: %w", err)
+			}
+		}
 
 		if createServiceWait {
 			fmt.Println("Waiting for service to reach steady state...")
@@ -194,10 +244,6 @@ var createServiceCmd = &cobra.Command{
 		}
 
 		// Write to remote state if a context is configured
-		if err := writeServiceState(cfg, region); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: service created but state not updated: %v\n", err)
-		}
-
 		return nil
 	},
 }
@@ -221,7 +267,10 @@ func init() {
 	createClusterCmd.Flags().StringVarP(&createClusterFile, "file", "f", "", "Path to cluster config YAML")
 	createClusterCmd.Flags().StringVar(&createClusterName, "name", "", "Cluster name")
 	createClusterCmd.Flags().StringVar(&createClusterRegion, "region", "", "AWS region (e.g. eu-west-2)")
-	createClusterCmd.Flags().StringSliceVar(&createClusterCapacityProviders, "capacity-providers", nil, "Capacity providers, e.g. FARGATE,FARGATE_SPOT (optional)")
+	createClusterCmd.Flags().StringSliceVar(&createClusterCapacityProviders, "capacity-providers", nil, "Capacity providers (defaults to FARGATE; incompatible with --ec2)")
+	createClusterCmd.Flags().BoolVar(&createClusterEC2, "ec2", false, "Create an EC2-backed cluster in the default VPC")
+	createClusterCmd.Flags().StringVar(&createClusterEC2InstanceType, "ec2-instance-type", "t3.small", "EC2 instance type used with --ec2")
+	createClusterCmd.Flags().Int32Var(&createClusterEC2Count, "ec2-count", 1, "Initial EC2 instance count used with --ec2")
 	createClusterCmd.Flags().StringArrayVar(&createClusterTags, "tags", nil, "Tags as key=value pairs (repeatable: --tags env=prod --tags team=platform)")
 
 	// create service flags
@@ -229,7 +278,7 @@ func init() {
 	createServiceCmd.Flags().StringVar(&createServiceName, "name", "", "Service name")
 	createServiceCmd.Flags().StringVar(&createServiceCluster, "cluster", "", "ECS cluster name")
 	createServiceCmd.Flags().StringVar(&createServiceTaskDefinition, "task-definition", "", "Task definition family:revision (e.g. my-task:3)")
-	createServiceCmd.Flags().StringVar(&createServiceLaunchType, "launch-type", "FARGATE", "Launch type: FARGATE or EC2")
+	createServiceCmd.Flags().StringVar(&createServiceLaunchType, "launch-type", "", "Launch type: FARGATE or EC2 (defaults to the cluster capacity-provider strategy)")
 	createServiceCmd.Flags().StringVar(&createServiceSchedulingStrategy, "scheduling-strategy", "REPLICA", "Scheduling strategy: REPLICA or DAEMON")
 	createServiceCmd.Flags().Int32Var(&createServiceDesiredCount, "desired-count", 1, "Desired task count")
 	createServiceCmd.Flags().StringSliceVar(&createServiceSubnets, "subnets", nil, "Subnet IDs (comma-separated)")
@@ -242,72 +291,6 @@ func init() {
 	createCmd.AddCommand(createServiceCmd)
 }
 
-// writeClusterState writes a newly created cluster into remote state.
-// Silently skips if no state context is configured.
-func writeClusterState(cfg *config.ClusterConfig, region string) error {
-	serialized, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("serializing cluster config for remote state: %w", err)
-	}
-	return writeState(func(st *state.State) {
-		u, _ := user.Current()
-		creator := "unknown"
-		if u != nil {
-			creator = u.Username
-		}
-		st.AddResource(state.Resource{
-			Type:          state.ResourceTypeCluster,
-			Name:          cfg.Name,
-			Region:        region,
-			CreatedBy:     creator,
-			CreatedAt:     time.Now().UTC(),
-			Configuration: string(serialized),
-		})
-	})
-}
-
-// writeServiceState writes a newly created service into remote state.
-func writeServiceState(cfg *config.ServiceConfig, region string) error {
-	serialized, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("serializing service config for remote state: %w", err)
-	}
-	return writeState(func(st *state.State) {
-		u, _ := user.Current()
-		creator := "unknown"
-		if u != nil {
-			creator = u.Username
-		}
-		st.AddResource(state.Resource{
-			Type:          state.ResourceTypeService,
-			Name:          cfg.Name,
-			Cluster:       cfg.Cluster,
-			Region:        region,
-			CreatedBy:     creator,
-			CreatedAt:     time.Now().UTC(),
-			Configuration: string(serialized),
-		})
-	})
-}
-
-func writeExpressState(cfg *config.ExpressServiceConfig, arn, region string) error {
-	serialized, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("serializing Express config for remote state: %w", err)
-	}
-	return writeState(func(st *state.State) {
-		st.AddResource(state.Resource{
-			Type: state.ResourceTypeExpressService, Name: cfg.ServiceName, ARN: arn,
-			Cluster: cfg.Cluster, Region: region, CreatedBy: currentUsername(),
-			CreatedAt: time.Now().UTC(), Configuration: string(serialized),
-		})
-	})
-}
-
-func removeResourceStateByARN(arn string) error {
-	return writeState(func(st *state.State) { st.RemoveResourceByARN(arn) })
-}
-
 func currentUsername() string {
 	u, _ := user.Current()
 	if u == nil {
@@ -316,40 +299,171 @@ func currentUsername() string {
 	return u.Username
 }
 
-// writeState loads the active context, acquires a lock, applies fn to state, and saves.
-// Returns nil (no error) if no context is configured — state is optional.
-func writeState(fn func(*state.State)) error {
-	ctx := context.Background()
+// stateSession holds the remote state lock across a resource operation and its
+// state update, serializing ecsctl mutating commands that share a context.
+type stateSession struct {
+	backend *state.Backend
+	current *state.State
+	ctx     context.Context
+}
 
+func beginStateSession(ctx context.Context) (*stateSession, error) {
 	localCfg, err := localconfig.Load()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if localCfg.CurrentContext == "" && stateContext == "" {
-		return nil // no state configured, skip silently
+		return nil, nil
 	}
-
 	_, activeCtx, err := localCfg.GetActiveContext(stateContext)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	backend, err := state.NewBackend(ctx, activeCtx.Bucket, activeCtx.Key, activeCtx.Region, activeCtx.Profile, activeCtx.KmsKeyID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	if err := backend.Lock(ctx); err != nil {
-		return err
+		return nil, err
 	}
-	defer backend.Unlock(ctx) //nolint:errcheck
+	current, err := backend.Load(ctx)
+	if err != nil {
+		if unlockErr := backend.Unlock(ctx); unlockErr != nil {
+			return nil, fmt.Errorf("loading state: %v; releasing state lock: %w", err, unlockErr)
+		}
+		return nil, err
+	}
+	return &stateSession{backend: backend, current: current, ctx: ctx}, nil
+}
 
-	st, err := backend.Load(ctx)
+func (s *stateSession) Update(fn func(*state.State)) error {
+	if s == nil {
+		return nil
+	}
+	fn(s.current)
+	return s.backend.Save(s.ctx, s.current)
+}
+
+func (s *stateSession) Close() error {
+	if s == nil {
+		return nil
+	}
+	return s.backend.Unlock(s.ctx)
+}
+
+func closeStateSessionOnReturn(session *stateSession, runErr *error, operation string) {
+	if session == nil {
+		return
+	}
+	if err := session.Close(); err != nil {
+		if *runErr == nil {
+			*runErr = fmt.Errorf("%s: %w", operation, err)
+		} else {
+			*runErr = fmt.Errorf("%w; %s: %v", *runErr, operation, err)
+		}
+	}
+}
+
+func recordClusterState(s *stateSession, client *aws.Client, cfg *config.ClusterConfig, region string) error {
+	if region == "" {
+		region = client.Region()
+	}
+	storedConfig := *cfg
+	if storedConfig.Region == "" {
+		storedConfig.Region = region
+	}
+	serialized, err := yaml.Marshal(&storedConfig)
+	if err != nil {
+		return fmt.Errorf("serializing cluster config for remote state: %w", err)
+	}
+	arn, err := client.ClusterARN(context.Background(), cfg.Name)
+	if err != nil {
+		return fmt.Errorf("reading cluster identity for remote state: %w", err)
+	}
+	resource := state.Resource{
+		Type: state.ResourceTypeCluster, Name: cfg.Name, ARN: arn,
+		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+	}
+	return s.Update(func(st *state.State) {
+		st.AddResource(resource)
+	})
+}
+
+func recordServiceState(s *stateSession, client *aws.Client, cfg *config.ServiceConfig, region string) error {
+	if region == "" {
+		region = client.Region()
+	}
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing service config for remote state: %w", err)
+	}
+	arn, err := client.ServiceARN(context.Background(), cfg.Cluster, cfg.Name)
+	if err != nil {
+		return fmt.Errorf("reading service identity for remote state: %w", err)
+	}
+	resource := state.Resource{
+		Type: state.ResourceTypeService, Name: cfg.Name, ARN: arn, Cluster: cfg.Cluster,
+		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+	}
+	return s.Update(func(st *state.State) {
+		st.AddResource(resource)
+	})
+}
+
+func recordExpressState(s *stateSession, client *aws.Client, cfg *config.ExpressServiceConfig, arn, region string) error {
+	if region == "" {
+		region = client.Region()
+	}
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing Express config for remote state: %w", err)
+	}
+	resource := &state.Resource{
+		Type: state.ResourceTypeExpressService, Name: cfg.ServiceName, ARN: arn, Cluster: cfg.Cluster,
+		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+	}
+	return s.Update(func(st *state.State) {
+		st.AddResource(*resource)
+	})
+}
+
+func updateTrackedServiceConfig(session *stateSession, client *aws.Client, cluster, service string, update func(*config.ServiceConfig)) error {
+	if session == nil {
+		return nil
+	}
+	arn, err := client.ServiceARN(context.Background(), cluster, service)
 	if err != nil {
 		return err
 	}
-
-	fn(st)
-
-	return backend.Save(ctx, st)
+	for _, resource := range session.current.Resources {
+		if resource.Type != state.ResourceTypeService || resource.Name != service || resource.Cluster != cluster || (resource.ARN != "" && resource.ARN != arn) {
+			continue
+		}
+		if resource.Configuration == "" {
+			return fmt.Errorf("tracked service %q has no saved configuration to update", service)
+		}
+		var cfg config.ServiceConfig
+		if err := yaml.Unmarshal([]byte(resource.Configuration), &cfg); err != nil {
+			return fmt.Errorf("parsing tracked service configuration: %w", err)
+		}
+		var fields map[string]yaml.Node
+		if err := yaml.Unmarshal([]byte(resource.Configuration), &fields); err != nil {
+			return fmt.Errorf("parsing tracked service configuration: %w", err)
+		}
+		_, cfg.DesiredCountConfigured = fields["desiredCount"]
+		_, cfg.HealthCheckGraceConfigured = fields["healthCheckGracePeriodSeconds"]
+		_, cfg.LaunchTypeConfigured = fields["launchType"]
+		update(&cfg)
+		serialized, err := yaml.Marshal(&cfg)
+		if err != nil {
+			return fmt.Errorf("serializing tracked service configuration: %w", err)
+		}
+		resource.ARN = arn
+		resource.Region = client.Region()
+		resource.Configuration = string(serialized)
+		return session.Update(func(st *state.State) {
+			st.AddResource(resource)
+		})
+	}
+	return nil
 }

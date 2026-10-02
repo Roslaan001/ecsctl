@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+merge_head="$(git rev-parse --git-path MERGE_HEAD)"
+if [[ -f "$merge_head" ]]; then
+	exit 0
+fi
+
+message_file="${1:?commit message file is required}"
+message="$(cat "$message_file")"
+bash scripts/validate-commit-message.sh "$message"

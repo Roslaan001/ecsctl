@@ -33,6 +33,10 @@ ECS may take time to start tasks and make a service healthy. Add `--wait` when y
 ecsctl apply -f service.yaml --wait
 ```
 
+For an existing resource, `--dry-run` lists the configured fields that differ from AWS. It does not include fields omitted from the YAML. For a service, omitting `desiredCount` leaves the live count alone; set `desiredCount: 0` to intentionally scale it to zero. For list-valued settings such as `capacityProviders`, `capacityProviderStrategy`, `loadBalancers`, `serviceRegistries`, `placementConstraints`, and `placementStrategy`, use an explicit empty list (`[]`) to clear existing values; omit the property to leave it unchanged.
+
+For a cluster file, `region` selects the AWS region unless the global `--region` flag overrides it.
+
 ## IDE Integration & Validation
 
 `ecsctl` provides JSON Schemas for both Cluster and Service configurations. This allows modern editors (like VS Code, IntelliJ, and GoLand) to provide auto-completion, hover definitions, and real-time validation for your configuration files.
@@ -194,12 +198,28 @@ If you want to quickly spin up a resource without writing a YAML file, pass the 
 
 ```bash
 # Create a cluster using flags
+ecsctl create cluster --name my-cluster --region us-east-1
+ecsctl create cluster --name my-ec2-cluster --region us-east-1 --ec2
+
+# Add Fargate Spot explicitly
 ecsctl create cluster --name my-cluster --region us-east-1 --capacity-providers FARGATE,FARGATE_SPOT
 
 # Create a service using flags
 ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3 \
   --subnets subnet-abc123 --security-groups sg-abc123
 ```
+
+Without `--ec2`, `create cluster` attaches `FARGATE` and uses it as the default
+capacity-provider strategy. With `--ec2`, ecsctl uses public subnets in the
+region's default VPC, an ECS-optimized Amazon Linux 2023 image, a `t3.small`
+instance, and an EC2 Auto Scaling capacity provider. It launches one instance by
+default; `--ec2-instance-type` and `--ec2-count` override these defaults. The
+EC2-backed cluster keeps Fargate attached as an option but defaults workloads to
+EC2. Creating and running EC2 instances incurs AWS charges.
+
+If you provide a custom Fargate provider list, ecsctl uses `FARGATE` as the
+strategy only when it appears in that list; set
+`defaultCapacityProviderStrategy` in YAML to choose another default.
 
 
 ---

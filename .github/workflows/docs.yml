@@ -1,4 +1,4 @@
-name: Docs
+name: GitHub Pages
 
 on:
   pull_request:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build-docs:
-    name: Docs build
+    name: Build documentation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -58,5 +58,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install mkdocs-material
 
-      - name: Deploy documentation
+      - name: Publish GitHub Pages
         run: mkdocs gh-deploy --force

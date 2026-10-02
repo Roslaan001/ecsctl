@@ -62,20 +62,26 @@ func TestAddResource_Upsert(t *testing.T) {
 	t.Error("cluster-a not found after upsert")
 }
 
-func TestAddResource_ServiceUpsertByNameAndCluster(t *testing.T) {
+func TestAddResource_ServiceUpsertByNameClusterAndRegion(t *testing.T) {
 	st := baseState()
 	before := len(st.Resources)
 
 	// svc-1 in cluster-a already exists — should update
-	st.AddResource(Resource{Type: ResourceTypeService, Name: "svc-1", Cluster: "cluster-a", CreatedBy: "updated"})
+	st.AddResource(Resource{Type: ResourceTypeService, Name: "svc-1", Cluster: "cluster-a", Region: "eu-west-2", CreatedBy: "updated"})
 	if len(st.Resources) != before {
 		t.Errorf("upsert should not change count: got %d, want %d", len(st.Resources), before)
 	}
 
 	// svc-1 in cluster-b does NOT exist — should add
-	st.AddResource(Resource{Type: ResourceTypeService, Name: "svc-1", Cluster: "cluster-b", CreatedBy: "new"})
+	st.AddResource(Resource{Type: ResourceTypeService, Name: "svc-1", Cluster: "cluster-b", Region: "eu-west-2", CreatedBy: "new"})
 	if len(st.Resources) != before+1 {
 		t.Errorf("new service in different cluster should be added: got %d, want %d", len(st.Resources), before+1)
+	}
+
+	// svc-1 in cluster-a but another region is a distinct resource.
+	st.AddResource(Resource{Type: ResourceTypeService, Name: "svc-1", Cluster: "cluster-a", Region: "us-east-1", CreatedBy: "new"})
+	if len(st.Resources) != before+2 {
+		t.Errorf("new service in different region should be added: got %d, want %d", len(st.Resources), before+2)
 	}
 }
 

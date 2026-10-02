@@ -1,6 +1,6 @@
 # Installation
 
-Choose the installation method that matches your machine. The installer downloads a prebuilt binary; `go install` and building from source require Go.
+Choose the installation method that matches your machine. The installer downloads a prebuilt binary and verifies it against the release's SHA-256 checksums; `go install` and building from source require Go.
 
 ---
 
@@ -11,14 +11,21 @@ Choose the installation method that matches your machine. The installer download
     To download and install the latest precompiled release binary automatically, run:
 
     ```bash
-    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
+    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh
     ```
 
     #### Install a specific version
     To install a tagged release instead of the latest release, pass its tag:
 
     ```bash
-    curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh -s -- v0.1.0
+    curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh -s -- v0.2.1
+    ```
+
+    Set `ECSCTL_INSTALL_DIR` to choose an install directory. This is useful for
+    CI and isolated installs; for example:
+
+    ```bash
+    ECSCTL_INSTALL_DIR="$HOME/.local/bin" sh install.sh
     ```
 
     #### Install without administrator access
@@ -33,7 +40,7 @@ Choose the installation method that matches your machine. The installer download
     To download and install the latest precompiled release binary automatically on Windows, run the following command in **PowerShell**:
 
     ```powershell
-    irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
+    irm https://roslaan001.github.io/ecsctl/install.ps1 | iex
     ```
 
     The script automatically:
@@ -48,6 +55,19 @@ After installing, open a new terminal if your `PATH` changed and confirm the com
 ```bash
 ecsctl version
 ```
+
+## Verify release provenance
+
+Starting with v0.2.3, release archives include a GitHub artifact attestation
+that links each archive to the repository and workflow that built it. After
+downloading an archive, verify its provenance with the GitHub CLI:
+
+```bash
+gh attestation verify ecsctl_0.2.3_linux_amd64.tar.gz --repo Roslaan001/ecsctl
+```
+
+Replace the example filename with the archive for your operating system and
+architecture. The installer also checks the archive's SHA-256 checksum.
 
 
 ---

@@ -46,6 +46,14 @@ Switch the active context to change which S3 bucket you are querying and applyin
 ecsctl state use-context staging
 ```
 
+Resource-changing commands (`apply`, `create`, `delete`, Express updates, `deploy`, and `scale`) hold the selected context's S3 lock across the ECS operation and the corresponding state update. `deploy` and `scale` also update the tracked service configuration when one exists. If a process exits before it can release the lock, first confirm that no command is still using the context, then inspect and remove a stale lock with:
+
+```bash
+ecsctl state unlock --force
+```
+
+`--force` is required because removing a lock while another command is active can allow conflicting changes. Normal lock release is conditional on the lock object still being the one acquired by that command.
+
 ---
 
 ## 3. Importing Existing Resources (`state import`)
@@ -86,3 +94,13 @@ Print the active context details and the resources recorded in its S3 state:
 ```bash
 ecsctl state show
 ```
+
+## 5. Check for Drift (`state drift`)
+
+Compare the saved configuration of every tracked resource with its live ECS configuration:
+
+```bash
+ecsctl state drift
+```
+
+The scan is read-only. It reports configured fields that differ, resources that are up to date, resources without a captured configuration, and errors such as resources that no longer exist. Use `--region` or `--profile` to override the AWS location or identity for the scan. Imported resources whose configuration was not captured are skipped until a saved configuration is available.

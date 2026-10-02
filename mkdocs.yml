@@ -1,7 +1,7 @@
 site_name: ecsctl
 site_description: A CLI tool for managing Amazon ECS resources, inspired by eksctl.
 site_author: Roslaan001
-site_url: https://ecsctl.abdulsomad005.workers.dev
+site_url: https://roslaan001.github.io/ecsctl/
 
 theme:
   name: material

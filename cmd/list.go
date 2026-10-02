@@ -11,7 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCluster string
+var (
+	listCluster string
+	listLive    bool
+)
 
 // listCmd is the parent for all "list" subcommands.
 var listCmd = &cobra.Command{
@@ -27,23 +30,26 @@ var listClustersCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		// Try state first
-		if resources, ok := listClustersFromState(ctx); ok {
-			fmt.Printf("%-40s %-10s %s\n", "NAME", "REGION", "CREATED BY")
-			fmt.Println("--------------------------------------------------------------------------------")
-			if len(resources) == 0 {
-				fmt.Println("No clusters in state.")
+		// Try state first unless the caller explicitly requests live AWS data.
+		if !listLive {
+			resources, ok := listClustersFromState(ctx)
+			if ok {
+				fmt.Printf("%-40s %-10s %s\n", "NAME", "REGION", "CREATED BY")
+				fmt.Println("--------------------------------------------------------------------------------")
+				if len(resources) == 0 {
+					fmt.Println("No clusters in state.")
+					return nil
+				}
+				for _, r := range resources {
+					fmt.Printf("%-40s %-10s %s\n", r.Name, r.Region, r.CreatedBy)
+				}
+				fmt.Println("\n(source: remote state)")
 				return nil
 			}
-			for _, r := range resources {
-				fmt.Printf("%-40s %-10s %s\n", r.Name, r.Region, r.CreatedBy)
-			}
-			fmt.Println("\n(source: remote state)")
-			return nil
 		}
 
 		// Fall back to live AWS
-		fmt.Println("(no state configured — querying AWS directly)")
+		fmt.Println("(querying live AWS)")
 		client, err := aws.NewECSClient(ctx, region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
@@ -64,23 +70,26 @@ var listServicesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		// Try state first
-		if resources, ok := listServicesFromState(ctx, listCluster); ok {
-			fmt.Printf("%-40s %-30s %-10s %s\n", "NAME", "CLUSTER", "REGION", "CREATED BY")
-			fmt.Println("--------------------------------------------------------------------------------")
-			if len(resources) == 0 {
-				fmt.Println("No services in state.")
+		// Try state first unless the caller explicitly requests live AWS data.
+		if !listLive {
+			resources, ok := listServicesFromState(ctx, listCluster)
+			if ok {
+				fmt.Printf("%-40s %-30s %-10s %s\n", "NAME", "CLUSTER", "REGION", "CREATED BY")
+				fmt.Println("--------------------------------------------------------------------------------")
+				if len(resources) == 0 {
+					fmt.Println("No services in state.")
+					return nil
+				}
+				for _, r := range resources {
+					fmt.Printf("%-40s %-30s %-10s %s\n", r.Name, r.Cluster, r.Region, r.CreatedBy)
+				}
+				fmt.Println("\n(source: remote state)")
 				return nil
 			}
-			for _, r := range resources {
-				fmt.Printf("%-40s %-30s %-10s %s\n", r.Name, r.Cluster, r.Region, r.CreatedBy)
-			}
-			fmt.Println("\n(source: remote state)")
-			return nil
 		}
 
 		// Fall back to live AWS
-		fmt.Println("(no state configured — querying AWS directly)")
+		fmt.Println("(querying live AWS)")
 		client, err := aws.NewECSClient(ctx, region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
@@ -143,6 +152,7 @@ func listServicesFromState(ctx context.Context, cluster string) ([]state.Resourc
 }
 
 func init() {
+	listCmd.PersistentFlags().BoolVar(&listLive, "live", false, "Query AWS directly instead of listing the saved state inventory")
 	listServicesCmd.Flags().StringVar(&listCluster, "cluster", "", "ECS cluster name (required)")
 	_ = listServicesCmd.MarkFlagRequired("cluster")
 

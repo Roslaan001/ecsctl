@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -115,7 +116,14 @@ func (c *Client) ReconcileExpressService(ctx context.Context, arn string, cfg *e
 		return false, nil
 	}
 	if dryRun {
-		fmt.Printf("[dry-run] Would reconcile configured fields for Express service %q.\n", cfg.ServiceName)
+		fields := make([]string, 0, 2)
+		if configurationDrift {
+			fields = append(fields, "configuration")
+		}
+		if tagsDrift {
+			fields = append(fields, "tags")
+		}
+		fmt.Printf("[dry-run] Express service %q would update: %s.\n", cfg.ServiceName, strings.Join(fields, ", "))
 		return true, nil
 	}
 	if configurationDrift {

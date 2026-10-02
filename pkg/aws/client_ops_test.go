@@ -71,7 +71,7 @@ func TestRunTaskMapsNetworkOptionsAndReturnsARNs(t *testing.T) {
 		t.Fatalf("task ARNs = %#v", got)
 	}
 	in := mock.runTaskInput
-	if awssdk.ToString(in.Cluster) != "cluster-a" || awssdk.ToString(in.TaskDefinition) != "worker:3" || awssdk.ToInt32(in.Count) != 2 || in.LaunchType != types.LaunchTypeFargate {
+	if awssdk.ToString(in.Cluster) != "cluster-a" || awssdk.ToString(in.TaskDefinition) != "worker:3" || awssdk.ToInt32(in.Count) != 2 || in.LaunchType != "" {
 		t.Fatalf("RunTask input = %#v", in)
 	}
 	if in.NetworkConfiguration == nil || in.NetworkConfiguration.AwsvpcConfiguration == nil {

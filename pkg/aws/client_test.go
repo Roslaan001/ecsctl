@@ -67,6 +67,15 @@ func (m *mockECS) CreateCluster(_ context.Context, input *ecs.CreateClusterInput
 	m.createClusterInput = input
 	return &ecs.CreateClusterOutput{}, m.createClusterErr
 }
+func (m *mockECS) CreateCapacityProvider(_ context.Context, _ *ecs.CreateCapacityProviderInput, _ ...func(*ecs.Options)) (*ecs.CreateCapacityProviderOutput, error) {
+	panic("unexpected: CreateCapacityProvider")
+}
+func (m *mockECS) DeleteCapacityProvider(_ context.Context, _ *ecs.DeleteCapacityProviderInput, _ ...func(*ecs.Options)) (*ecs.DeleteCapacityProviderOutput, error) {
+	panic("unexpected: DeleteCapacityProvider")
+}
+func (m *mockECS) DescribeCapacityProviders(_ context.Context, _ *ecs.DescribeCapacityProvidersInput, _ ...func(*ecs.Options)) (*ecs.DescribeCapacityProvidersOutput, error) {
+	panic("unexpected: DescribeCapacityProviders")
+}
 func (m *mockECS) UpdateCluster(_ context.Context, input *ecs.UpdateClusterInput, _ ...func(*ecs.Options)) (*ecs.UpdateClusterOutput, error) {
 	m.updateClusterInput = input
 	return &ecs.UpdateClusterOutput{}, m.updateClusterErr
@@ -470,5 +479,21 @@ func TestDeployServicePreservesTaskDefinitionFields(t *testing.T) {
 	}
 	if aws.ToString(in.ContainerDefinitions[0].Image) != "new-image" {
 		t.Fatalf("container image not updated: %s", aws.ToString(in.ContainerDefinitions[0].Image))
+	}
+}
+
+func TestDeployServiceOmitsEmptyTaskDefinitionTags(t *testing.T) {
+	mock := &mockECS{
+		describeServicesOut: &ecs.DescribeServicesOutput{Services: []types.Service{{TaskDefinition: aws.String("api:4")}}},
+		describeTaskDefOut: &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{
+			Family: aws.String("api"), ContainerDefinitions: []types.ContainerDefinition{{Name: aws.String("web"), Image: aws.String("old")}},
+		}},
+		registerTaskDefOut: &ecs.RegisterTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{TaskDefinitionArn: aws.String("api:5")}},
+	}
+	if _, err := testClient(mock).DeployService(context.Background(), "prod", "api", "web", "new-image"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mock.registerTaskDefIn.Tags; len(got) != 0 {
+		t.Fatalf("empty task definition tags should be omitted, got %#v", got)
 	}
 }

@@ -6,7 +6,7 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh
 #   or specify a version:
-#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/Roslaan001/ecsctl/main/install.sh | sh -s -- v0.2.1
 
 set -e
 
@@ -35,8 +35,8 @@ case "$ARCH" in
         ;;
 esac
 
-# Parse version argument if provided
-VERSION=""
+# Parse a version argument or environment override if provided
+VERSION=${ECSCTL_VERSION:-}
 if [ $# -gt 0 ]; then
     VERSION="$1"
 fi
@@ -46,16 +46,26 @@ if [ -z "$VERSION" ]; then
     echo "Resolving the latest release version for $REPO..."
     LATEST_RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
     
-    # Try fetching using curl or wget with User-Agent header
+    RELEASE_INFO=""
     if command -v curl >/dev/null 2>&1; then
-        VERSION=$(curl -sH "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(curl -fsSL -H "User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
     elif command -v wget >/dev/null 2>&1; then
-        VERSION=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        RELEASE_INFO=$(wget -qO- --header="User-Agent: ecsctl-installer" "$LATEST_RELEASE_URL") || {
+            echo "Error: could not resolve the latest release. Check your network or pass a version tag." >&2
+            exit 1
+        }
+    else
+        echo "Error: curl or wget is required to resolve the latest release." >&2
+        exit 1
     fi
-    
-    # Fallback to latest known version if repo is private or API limit hit
+
+    VERSION=$(printf '%s\n' "$RELEASE_INFO" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
     if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        VERSION="v0.0.1"
+        echo "Error: GitHub did not return a latest release tag. Pass a version tag explicitly." >&2
+        exit 1
     fi
 fi
 
@@ -65,7 +75,7 @@ echo "Selected version: $VERSION"
 
 # Format download URL
 FILENAME="${BINARY}_${VERSION_CLEAN}_${OS}_${ARCH}.tar.gz"
-DOWNLOAD_URL="https://ecsctl.abdulsomad005.workers.dev/bin/$FILENAME"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
 
 # Create a temporary directory for extraction
 TMP_DIR=$(mktemp -d)
@@ -79,12 +89,34 @@ TARBALL="$TMP_DIR/$FILENAME"
 
 if command -v curl >/dev/null 2>&1; then
     curl -fsSL -o "$TARBALL" "$DOWNLOAD_URL"
+    curl -fsSL -o "$TMP_DIR/checksums.txt" "https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
 elif command -v wget >/dev/null 2>&1; then
     wget -qO "$TARBALL" "$DOWNLOAD_URL"
+    wget -qO "$TMP_DIR/checksums.txt" "https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
 else
-    echo "Error: curl or wget is required to download the binary." >&2
+    echo "Error: curl or wget is required to download and verify the binary." >&2
     exit 1
 fi
+
+EXPECTED_SHA256=$(awk -v file="$FILENAME" '$2 == file || $2 == "*" file { print $1; exit }' "$TMP_DIR/checksums.txt")
+if [ -z "$EXPECTED_SHA256" ]; then
+    echo "Error: no checksum found for $FILENAME in the release checksums." >&2
+    exit 1
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL_SHA256=$(sha256sum "$TARBALL" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL_SHA256=$(shasum -a 256 "$TARBALL" | awk '{print $1}')
+else
+    echo "Error: sha256sum or shasum is required to verify the downloaded binary." >&2
+    exit 1
+fi
+if [ "$(printf '%s' "$EXPECTED_SHA256" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$ACTUAL_SHA256" | tr '[:upper:]' '[:lower:]')" ]; then
+    echo "Error: SHA-256 checksum verification failed for $FILENAME." >&2
+    exit 1
+fi
+echo "SHA-256 checksum verified."
 
 echo "Extracting binary..."
 tar -xzf "$TARBALL" -C "$TMP_DIR"
@@ -95,13 +127,16 @@ if [ ! -f "$TMP_DIR/$BINARY" ]; then
     exit 1
 fi
 
-# Determine target directory
-# Default to /usr/local/bin, fallback to $HOME/.local/bin if not root and /usr/local/bin not writable.
-# Determine target directory and perform installation
-TARGET_DIR="/usr/local/bin"
+# Determine target directory. ECSCTL_INSTALL_DIR supports isolated installs and tests.
+TARGET_DIR=${ECSCTL_INSTALL_DIR:-/usr/local/bin}
 INSTALLED=0
 
-if [ -w "$TARGET_DIR" ]; then
+if [ -n "${ECSCTL_INSTALL_DIR:-}" ]; then
+    mkdir -p "$TARGET_DIR"
+    cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
+    chmod +x "$TARGET_DIR/$BINARY"
+    INSTALLED=1
+elif [ -w "$TARGET_DIR" ]; then
     echo "Installing to $TARGET_DIR..."
     cp "$TMP_DIR/$BINARY" "$TARGET_DIR/$BINARY"
     chmod +x "$TARGET_DIR/$BINARY"

@@ -1,12 +1,11 @@
 # ecsctl
 
 [![CI](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Roslaan001/ecsctl/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/roslaan001/ecsctl)](https://goreportcard.com/report/github.com/roslaan001/ecsctl)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
-📖 **[Read the full documentation](https://ecsctl.abdulsomad005.workers.dev)**
+📖 **[Read the full documentation](https://roslaan001.github.io/ecsctl/)**
 
 ---
 
@@ -16,12 +15,12 @@ A CLI tool for managing Amazon ECS resources, inspired by `eksctl`.
 
 **macOS / Linux**:
 ```bash
-curl -fsSL https://ecsctl.abdulsomad005.workers.dev/install.sh | sh
+curl -fsSL https://roslaan001.github.io/ecsctl/install.sh | sh
 ```
 
 **Windows (PowerShell)**:
 ```powershell
-irm https://ecsctl.abdulsomad005.workers.dev/install.ps1 | iex
+irm https://roslaan001.github.io/ecsctl/install.ps1 | iex
 ```
 
 ### 2. Using `go install`
@@ -42,7 +41,7 @@ make install
 
 ## Documentation
 
-The full documentation is built with MkDocs and hosted at [ecsctl.abdulsomad005.workers.dev](https://ecsctl.abdulsomad005.workers.dev). Pull requests build the site, and pushes to `main` deploy it to Cloudflare Workers through [the Workers workflow](.github/workflows/workers.yml).
+The full documentation is built with MkDocs and hosted on [GitHub Pages](https://roslaan001.github.io/ecsctl/). Pull requests build the site, and pushes to `main` or `master` publish it to the `gh-pages` branch through [the docs workflow](.github/workflows/docs.yml). Installers download release archives directly from GitHub Releases.
 
 To preview the documentation locally, run:
 
@@ -120,8 +119,18 @@ ecsctl create service -f service.yaml
 
 # Create directly using inline flags
 ecsctl create cluster --name my-cluster --region us-east-1
+ecsctl create cluster --name my-ec2-cluster --region us-east-1 --ec2
 ecsctl create service --name my-service --cluster my-cluster --task-definition my-task:3
 ```
+
+New clusters attach the `FARGATE` capacity provider and use it as the default
+capacity-provider strategy. Add `--ec2` to create an EC2-backed cluster using
+the region's default VPC, an ECS-optimized Amazon Linux 2023 image, and a `t3.small`
+instance by default. ECS creates one instance initially and manages the Auto
+Scaling group capacity; use `--ec2-instance-type` and `--ec2-count` to change the
+defaults. EC2 instances incur charges while running. Services and one-off tasks
+use the cluster's default capacity-provider strategy unless you select a launch
+type explicitly.
 
 ECS service YAML can also configure capacity-provider strategies, deployment controllers and safety settings, load balancers, Service Connect, placement, ECS Exec, tags, and Application Auto Scaling. See [the declarative configuration guide](docs/declarative.md).
 
@@ -138,7 +147,8 @@ See the [Express Mode guide](docs/express.md) for the role requirements and YAML
 
 ### Task definitions and one-off tasks
 
-Register a task definition JSON file and run or stop standalone Fargate tasks:
+Register a task definition JSON file and run or stop standalone ECS tasks. Unless
+you pass `--launch-type`, ECS uses the cluster's default capacity-provider strategy:
 
 ```bash
 ecsctl register task-definition -f task-definition.json
@@ -291,6 +301,26 @@ Print the S3 path and all tracked clusters and services inside the current state
 ecsctl state show
 ```
 
+### 5. Check for Drift
+
+Compare saved configurations in the active state context with live ECS resources without changing them:
+
+```bash
+ecsctl state drift
+```
+
+The scan reports drift, resources that are up to date, skipped resources without a saved configuration, and errors. Use `--context` to scan a different state context.
+
+### 6. State Locking
+
+When a state context is active, resource-changing commands hold its S3 lock until the AWS operation and state update finish. If a command leaves a stale lock, confirm that no operation is still running before removing it:
+
+```bash
+ecsctl state unlock --force
+```
+
+See the [Remote State guide](docs/state.md) for context setup, imports, drift checks, and lock recovery.
+
 ---
 
 ## Global Flags
@@ -305,7 +335,7 @@ The following flags can be passed to any subcommand to override default configur
 
 ## Build & Test
 
-`make test-floci` uses dummy `test` credentials and a local Floci endpoint; it does not need an AWS account or real AWS keys. The current Floci ECS API does not list the Express Gateway operations, so Floci covers the standard ECS service lifecycle. A manually dispatched [AWS Express smoke workflow](.github/workflows/express-aws-smoke.yml) creates, waits for, describes, and deletes a one-task service. It requires the `AWS_SMOKE_ROLE_ARN` GitHub secret configured for OIDC, plus an existing test cluster and ECS infrastructure/execution roles. See the [Floci ECS support matrix](https://floci.io/floci/services/ecs/).
+`make test-floci` uses dummy `test` credentials and a local Floci endpoint; it does not need an AWS account or real AWS keys. The current Floci ECS API does not list the Express Gateway operations, so Floci covers the standard ECS service lifecycle. A manually dispatched [AWS Express smoke workflow](.github/workflows/express-aws-smoke.yml) creates, waits for, describes, and deletes a one-task service. It uses GitHub OIDC through the `AWS_SMOKE_ROLE_ARN` secret, verifies the expected AWS account before creating resources, and requires ECS infrastructure/execution roles; leave the cluster input blank to create and remove a temporary cluster. See the [Floci ECS support matrix](https://floci.io/floci/services/ecs/).
 
 ```bash
 make build     # builds binary to ./bin/ecsctl
@@ -314,3 +344,7 @@ make test-floci # runs ECS integration test against local Floci (requires Docker
 make lint      # runs golangci-lint checking
 make clean     # cleans up build outputs and binaries
 ```
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance, commit message rules, pull request review, and CI checks.
