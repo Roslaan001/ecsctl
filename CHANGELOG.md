@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/Roslaan001/ecsctl/compare/v0.2.1...v0.2.2) (2026-10-02)
+
+
+### Bug Fixes
+
+* **install:** verify checksums across installer platforms ([#20](https://github.com/Roslaan001/ecsctl/issues/20)) ([b5bd7f9](https://github.com/Roslaan001/ecsctl/commit/b5bd7f94ac2bea2e4be825b9b37a2493195ad593))
+
 ## [0.2.1](https://github.com/Roslaan001/ecsctl/compare/v0.2.0...v0.2.1) (2026-10-02)
 
 
