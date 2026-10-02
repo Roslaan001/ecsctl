@@ -5,14 +5,17 @@ before="${1:-}"
 after="${2:-HEAD}"
 default_branch="${3:-main}"
 
+git fetch --no-tags origin "+refs/heads/$default_branch:refs/remotes/origin/$default_branch"
+
 if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
-	git fetch --no-tags origin "+refs/heads/$default_branch:refs/remotes/origin/$default_branch"
 	commit_range="origin/$default_branch..$after"
 else
 	commit_range="$before..$after"
 fi
 
-commit_list="$(git rev-list --reverse --no-merges "$commit_range")"
+# A branch push can include a merge from the default branch. Don't revalidate
+# commits already present there; only check commits unique to this branch.
+commit_list="$(git rev-list --reverse --no-merges "$commit_range" --not "origin/$default_branch")"
 if [[ -z "$commit_list" ]]; then
 	printf 'No new non-merge commits to validate.\n'
 	exit 0
