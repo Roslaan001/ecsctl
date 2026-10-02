@@ -128,6 +128,7 @@ jobs:
   installer-smoke:
     name: Installer smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request'
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -136,6 +137,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7.0.1
+
+      - name: Select the latest published release (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          git fetch --no-tags origin "$GITHUB_BASE_REF"
+          version=$(git show FETCH_HEAD:.release-please-manifest.json | sed -nE 's/.*"\."[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
+          test -n "$version"
+          echo "ECSCTL_VERSION=v$version" >> "$GITHUB_ENV"
+
+      - name: Select the latest published release (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin $env:GITHUB_BASE_REF
+          $manifest = (git show 'FETCH_HEAD:.release-please-manifest.json' | ConvertFrom-Json)
+          if ([string]::IsNullOrEmpty($manifest.'.')) { throw 'Could not read release version from the PR base manifest.' }
+          "ECSCTL_VERSION=v$($manifest.'.')" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install and run the latest release (macOS/Linux)
         if: runner.os != 'Windows'
