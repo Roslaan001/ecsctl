@@ -12,6 +12,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# GitHub Releases requires TLS 1.2 or newer. Set it even when the version is
+# supplied explicitly, since that path skips the release API request below.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $Repo = "Roslaan001/ecsctl"
 $Binary = "ecsctl"
 
@@ -35,7 +39,6 @@ $LatestReleaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
 if ([string]::IsNullOrEmpty($Version)) {
     Write-Host "Resolving the latest release version for $Repo..."
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -Headers @{"User-Agent"="ecsctl-installer"} -UseBasicParsing
         $Version = $ReleaseInfo.tag_name
     } catch {
@@ -75,8 +78,9 @@ try {
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
     Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/checksums.txt" -OutFile $ChecksumsPath -UseBasicParsing
 } catch {
-    Write-Error "Failed to download ecsctl or its release checksums. Verify that version $Version is published and contains the Windows assets."
+    $DownloadError = $_.Exception.Message
     Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
+    Write-Error "Failed to download ecsctl or its release checksums for version $Version. $DownloadError"
     Exit 1
 }
 
