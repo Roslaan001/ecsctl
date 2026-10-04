@@ -36,6 +36,11 @@ ECS assigns a revision number to the task definition. Use the returned family an
 
 `ecsctl deploy` uses the current task definition as a starting point, changes the selected container's image, registers a new revision, and updates the service. It preserves the other registrable task-level settings. See [Operations & Commands](commands.md).
 
+`ecsctl describe service` shows each deployment's task definition, creation time,
+and rollout reason. `ecsctl rollback SERVICE --cluster CLUSTER` updates an ECS
+rolling service to the task definition from its previous completed deployment;
+add `--wait` to wait for it to stabilize.
+
 ## Run a one-off ECS task
 
 Use `run-task` for work that should run once without an ECS service keeping it alive. Unless you set `--launch-type`, ECS uses the cluster's default capacity-provider strategy. For Fargate tasks that use `awsvpc` networking, provide subnets and, when needed, security groups that allow the container to reach its dependencies:

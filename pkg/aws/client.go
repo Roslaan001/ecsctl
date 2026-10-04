@@ -768,6 +768,53 @@ func (c *Client) DeployService(ctx context.Context, clusterName, serviceName, co
 	return newTaskDefARN, nil
 }
 
+// RollbackService updates a service to the task definition from its most recent
+// completed deployment other than the currently configured task definition.
+// It returns the task definition ARN selected for the rollback.
+func (c *Client) RollbackService(ctx context.Context, clusterName, serviceName string) (string, error) {
+	out, err := c.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster:  aws.String(clusterName),
+		Services: []string{serviceName},
+	})
+	if err != nil {
+		return "", fmt.Errorf("describing service: %w", err)
+	}
+	if len(out.Services) == 0 {
+		return "", fmt.Errorf("service %q not found in cluster %q", serviceName, clusterName)
+	}
+	svc := out.Services[0]
+	if svc.DeploymentController != nil && svc.DeploymentController.Type != types.DeploymentControllerTypeEcs {
+		return "", fmt.Errorf("service %q uses the %s deployment controller; ecsctl rollback supports ECS rolling deployments only", serviceName, svc.DeploymentController.Type)
+	}
+
+	currentTaskDef := aws.ToString(svc.TaskDefinition)
+	var previous *types.Deployment
+	for i := range svc.Deployments {
+		deployment := &svc.Deployments[i]
+		if aws.ToString(deployment.Status) != "COMPLETED" || aws.ToString(deployment.TaskDefinition) == currentTaskDef {
+			continue
+		}
+		if previous == nil || deployment.CreatedAt != nil && (previous.CreatedAt == nil || deployment.CreatedAt.After(*previous.CreatedAt)) {
+			previous = deployment
+		}
+	}
+	if previous == nil {
+		return "", fmt.Errorf("no previous completed deployment found for service %q", serviceName)
+	}
+	rollbackTaskDef := aws.ToString(previous.TaskDefinition)
+	if rollbackTaskDef == "" {
+		return "", fmt.Errorf("previous deployment for service %q has no task definition", serviceName)
+	}
+	if _, err := c.ecs.UpdateService(ctx, &ecs.UpdateServiceInput{
+		Cluster:        aws.String(clusterName),
+		Service:        aws.String(serviceName),
+		TaskDefinition: aws.String(rollbackTaskDef),
+	}); err != nil {
+		return "", fmt.Errorf("updating service to previous task definition: %w", err)
+	}
+	return rollbackTaskDef, nil
+}
+
 // WaitForDeployment polls the service deployments until the deployment using
 // newTaskDefARN reaches a PRIMARY/COMPLETED state with runningCount == desiredCount,
 // printing progress dots every 5 seconds. Times out after 10 minutes.
@@ -1182,13 +1229,22 @@ func (c *Client) PrintServiceDetail(ctx context.Context, clusterName, serviceNam
 	if len(svc.Deployments) > 0 {
 		fmt.Printf("\nDeployments:\n")
 		for _, d := range svc.Deployments {
-			fmt.Printf("  [%s] %s  desired=%d running=%d pending=%d\n",
+			created := "-"
+			if d.CreatedAt != nil {
+				created = d.CreatedAt.Format("2006-01-02 15:04:05")
+			}
+			fmt.Printf("  [%s] rollout=%s  task-definition=%s  created=%s  desired=%d running=%d pending=%d\n",
 				aws.ToString(d.Status),
 				string(d.RolloutState),
+				aws.ToString(d.TaskDefinition),
+				created,
 				d.DesiredCount,
 				d.RunningCount,
 				d.PendingCount,
 			)
+			if reason := aws.ToString(d.RolloutStateReason); reason != "" {
+				fmt.Printf("    reason: %s\n", reason)
+			}
 		}
 	}
 
