@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/Roslaan001/ecsctl/compare/v0.4.0...v0.5.0) (2026-10-04)
+
+
+### Features
+
+* add delete preview and confirmation ([#37](https://github.com/Roslaan001/ecsctl/issues/37)) ([40d3943](https://github.com/Roslaan001/ecsctl/commit/40d39432485c54efe82d5d233f226b68186da54c))
+* add ECS task diagnostics ([#36](https://github.com/Roslaan001/ecsctl/issues/36)) ([3bc35b6](https://github.com/Roslaan001/ecsctl/commit/3bc35b6c74fbcae8d61ff8e9c598289de22411b9))
+* add release update check ([#39](https://github.com/Roslaan001/ecsctl/issues/39)) ([29ab7f2](https://github.com/Roslaan001/ecsctl/commit/29ab7f2ed5f87a41974857c2638e2265891b3e13))
+* add service deployment rollback ([#38](https://github.com/Roslaan001/ecsctl/issues/38)) ([7c16889](https://github.com/Roslaan001/ecsctl/commit/7c168899fc42f8e57495b5fd401c8b753a0a944d))
+* unify live and state inventory views ([#35](https://github.com/Roslaan001/ecsctl/issues/35)) ([f7915cb](https://github.com/Roslaan001/ecsctl/commit/f7915cba4f7816504c88db42360d677b12946e13))
+
+
+### Maintenance
+
+* **release:** improve release notes and PR checks ([#41](https://github.com/Roslaan001/ecsctl/issues/41)) ([17dd390](https://github.com/Roslaan001/ecsctl/commit/17dd390c55c47c6f35c88f13ffb76e9631b0eac7))
+* **release:** sync open release PRs and show maintenance notes ([#42](https://github.com/Roslaan001/ecsctl/issues/42)) ([42015df](https://github.com/Roslaan001/ecsctl/commit/42015df90bb6c24132dd79f9b669545537927320))
+
 ## [0.4.0](https://github.com/Roslaan001/ecsctl/compare/v0.3.0...v0.4.0) (2026-10-04)
 
 
