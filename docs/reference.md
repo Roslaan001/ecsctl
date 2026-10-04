@@ -12,6 +12,7 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | `describe` | Show a cluster or service. |
 | `list` | List clusters, services, or tasks. |
 | `deploy` | Roll out a new service image. |
+| `rollback` | Restore the task definition from the previous completed service deployment. |
 | `scale` | Change a service's desired task count. |
 | `logs` | Read or follow service logs. |
 | `exec` | Open a shell or run a command in a task. |
@@ -102,8 +103,8 @@ Delete a resource by name.
 
 | Syntax | Flags |
 |---|---|
-| `ecsctl delete cluster NAME` | Optional `--force` to delete its services first. |
-| `ecsctl delete service NAME` | Required `--cluster CLUSTER`. |
+| `ecsctl delete cluster NAME` | Optional `--force` to delete its services first; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
+| `ecsctl delete service NAME` | Required `--cluster CLUSTER`; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
 
 ### `describe`
 
@@ -113,19 +114,20 @@ Show live configuration and runtime status.
 |---|---|
 | `ecsctl describe cluster NAME` | — |
 | `ecsctl describe service NAME` | `--cluster CLUSTER` |
+| `ecsctl describe task TASK` | `--cluster CLUSTER` |
 
 ### `list`
 
-List resources from saved state or query live AWS resources with `--live`.
+Cluster and service lists query live AWS by default and add tracking metadata from remote state when available. Use `--state` to list only saved resources; the legacy `--live` flag is still accepted.
 
 | Syntax | Flags |
 |---|---|
-| `ecsctl list clusters` | `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
-| `ecsctl list services` | `--cluster CLUSTER`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list clusters` | `--state`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list services` | `--cluster CLUSTER`, `--state`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
 | `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--name PREFIX`, `--status STATUS`, `--desired-status STATUS`, `--launch-type TYPE`, `--wide` |
 | `ecsctl list task-definitions` | `--status STATUS`, `--family PREFIX`, `--wide` |
 
-All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and creation time. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. State-backed cluster/service lists show saved inventory; runtime status filters use live AWS data. State-backed cluster lists include the recorded creation time when ecsctl created the cluster. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
+All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and AWS creation time. Cluster/service results include tracking metadata when available. State-only mode uses the same output fields, with null live fields. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. `--status` filters use live AWS and cannot be combined with `--state`. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
 
 ### `deploy`
 
@@ -141,6 +143,19 @@ ecsctl deploy SERVICE --cluster CLUSTER --image IMAGE [--container NAME]
 | `--image` | string | New image and tag, such as `nginx:latest`. Required. |
 | `--container` | string | Container to update. Defaults to the first container. |
 | `--wait` | boolean | Wait for the deployment to complete. |
+
+### `rollback`
+
+Restore the most recent completed deployment that used a different task definition.
+
+```text
+ecsctl rollback SERVICE --cluster CLUSTER [--wait]
+```
+
+`--wait` polls until the rollback deployment is stable. Rollback supports ECS
+rolling deployment controllers; CodeDeploy and external controllers are rejected.
+Use `ecsctl describe service SERVICE --cluster CLUSTER` to inspect deployment
+task definitions, creation times, and rollout reasons before or after rollback.
 
 ### `scale`
 

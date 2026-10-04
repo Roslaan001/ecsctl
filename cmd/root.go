@@ -23,6 +23,7 @@ Examples:
   ecsctl create cluster -f cluster.yaml
   ecsctl create service -f service.yaml
   ecsctl deploy my-service --image nginx:1.25
+  ecsctl rollback my-service --cluster my-cluster
   ecsctl logs my-service --tail 100
   ecsctl exec my-service --container web
   ecsctl scale my-service --desired 3

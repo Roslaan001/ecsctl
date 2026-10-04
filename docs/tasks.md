@@ -36,6 +36,11 @@ ECS assigns a revision number to the task definition. Use the returned family an
 
 `ecsctl deploy` uses the current task definition as a starting point, changes the selected container's image, registers a new revision, and updates the service. It preserves the other registrable task-level settings. See [Operations & Commands](commands.md).
 
+`ecsctl describe service` shows each deployment's task definition, creation time,
+and rollout reason. `ecsctl rollback SERVICE --cluster CLUSTER` updates an ECS
+rolling service to the task definition from its previous completed deployment;
+add `--wait` to wait for it to stabilize.
+
 ## Run a one-off ECS task
 
 Use `run-task` for work that should run once without an ECS service keeping it alive. Unless you set `--launch-type`, ECS uses the cluster's default capacity-provider strategy. For Fargate tasks that use `awsvpc` networking, provide subnets and, when needed, security groups that allow the container to reach its dependencies:
@@ -62,3 +67,12 @@ ecsctl stop-task --cluster production --task <task-id-or-arn>
 ```
 
 This requests that ECS stop the task; the task can remain in `STOPPING` briefly. Stopping it interrupts its current work. It does not delete the task definition or create a replacement task. Use `--reason` to include a reason in the stop request.
+
+## Investigate a task that stopped or failed
+
+Find stopped tasks, then inspect ECS stop details, per-container exit codes and errors, and network attachment information:
+
+```bash
+ecsctl list tasks --cluster production --desired-status STOPPED
+ecsctl describe task <task-id-or-arn> --cluster production
+```
