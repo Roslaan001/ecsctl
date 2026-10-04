@@ -14,6 +14,7 @@ import (
 var (
 	listCluster string
 	listLive    bool
+	listWide    bool
 )
 
 // listCmd is the parent for all "list" subcommands.
@@ -34,14 +35,22 @@ var listClustersCmd = &cobra.Command{
 		if !listLive {
 			resources, ok := listClustersFromState(ctx)
 			if ok {
-				fmt.Printf("%-40s %-10s %s\n", "NAME", "REGION", "CREATED BY")
+				if listWide {
+					fmt.Printf("%-40s %-10s %-20s %s\n", "NAME", "REGION", "CREATED BY", "ARN")
+				} else {
+					fmt.Printf("%-40s %-10s %s\n", "NAME", "REGION", "CREATED BY")
+				}
 				fmt.Println("--------------------------------------------------------------------------------")
 				if len(resources) == 0 {
 					fmt.Println("No clusters in state.")
 					return nil
 				}
 				for _, r := range resources {
-					fmt.Printf("%-40s %-10s %s\n", r.Name, r.Region, r.CreatedBy)
+					if listWide {
+						fmt.Printf("%-40s %-10s %-20s %s\n", r.Name, r.Region, r.CreatedBy, r.ARN)
+					} else {
+						fmt.Printf("%-40s %-10s %s\n", r.Name, r.Region, r.CreatedBy)
+					}
 				}
 				fmt.Println("\n(source: remote state)")
 				return nil
@@ -54,7 +63,7 @@ var listClustersCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
-		if err := client.ListClusters(ctx); err != nil {
+		if err := client.ListClusters(ctx, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}
@@ -74,14 +83,22 @@ var listServicesCmd = &cobra.Command{
 		if !listLive {
 			resources, ok := listServicesFromState(ctx, listCluster)
 			if ok {
-				fmt.Printf("%-40s %-30s %-10s %s\n", "NAME", "CLUSTER", "REGION", "CREATED BY")
+				if listWide {
+					fmt.Printf("%-40s %-30s %-10s %-20s %s\n", "NAME", "CLUSTER", "REGION", "CREATED BY", "ARN")
+				} else {
+					fmt.Printf("%-40s %-30s %-10s %s\n", "NAME", "CLUSTER", "REGION", "CREATED BY")
+				}
 				fmt.Println("--------------------------------------------------------------------------------")
 				if len(resources) == 0 {
 					fmt.Println("No services in state.")
 					return nil
 				}
 				for _, r := range resources {
-					fmt.Printf("%-40s %-30s %-10s %s\n", r.Name, r.Cluster, r.Region, r.CreatedBy)
+					if listWide {
+						fmt.Printf("%-40s %-30s %-10s %-20s %s\n", r.Name, r.Cluster, r.Region, r.CreatedBy, r.ARN)
+					} else {
+						fmt.Printf("%-40s %-30s %-10s %s\n", r.Name, r.Cluster, r.Region, r.CreatedBy)
+					}
 				}
 				fmt.Println("\n(source: remote state)")
 				return nil
@@ -94,7 +111,7 @@ var listServicesCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
-		if err := client.ListServices(ctx, listCluster); err != nil {
+		if err := client.ListServices(ctx, listCluster, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}
@@ -153,9 +170,11 @@ func listServicesFromState(ctx context.Context, cluster string) ([]state.Resourc
 
 func init() {
 	listCmd.PersistentFlags().BoolVar(&listLive, "live", false, "Query AWS directly instead of listing the saved state inventory")
+	listCmd.PersistentFlags().BoolVar(&listWide, "wide", false, "Include full ARNs in list output")
 	listServicesCmd.Flags().StringVar(&listCluster, "cluster", "", "ECS cluster name (required)")
 	_ = listServicesCmd.MarkFlagRequired("cluster")
 
 	listCmd.AddCommand(listClustersCmd)
 	listCmd.AddCommand(listServicesCmd)
+	listCmd.AddCommand(listTaskDefinitionsCmd)
 }

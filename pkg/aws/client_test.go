@@ -117,6 +117,9 @@ func (m *mockECS) UpdateService(_ context.Context, input *ecs.UpdateServiceInput
 func (m *mockECS) DescribeTaskDefinition(_ context.Context, _ *ecs.DescribeTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error) {
 	return m.describeTaskDefOut, nil
 }
+func (m *mockECS) ListTaskDefinitions(_ context.Context, _ *ecs.ListTaskDefinitionsInput, _ ...func(*ecs.Options)) (*ecs.ListTaskDefinitionsOutput, error) {
+	panic("unexpected: ListTaskDefinitions")
+}
 func (m *mockECS) RegisterTaskDefinition(_ context.Context, input *ecs.RegisterTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.RegisterTaskDefinitionOutput, error) {
 	m.registerTaskDefIn = input
 	return m.registerTaskDefOut, nil

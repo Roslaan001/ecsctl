@@ -11,7 +11,11 @@ The `list` command displays lists of clusters, services, and tasks. If a remote 
 ```bash
 ecsctl list clusters --live --region eu-west-2
 ecsctl list services --cluster production --live --region eu-west-2
+ecsctl list tasks --cluster production --wide --region eu-west-2
+ecsctl list task-definitions --status ACTIVE --wide --region eu-west-2
 ```
+
+Cluster lists show active services, running and pending tasks, and capacity providers. Service lists show desired, running, and pending tasks plus the task definition. Task lists include service, launch type, start time, and task definition. Add `--wide` to include full ARNs.
 
 ### 1. List Clusters
 List all ECS clusters:
@@ -42,6 +46,14 @@ ecsctl list tasks --cluster <cluster-name> --service <service-name>
 
 * `--cluster` (string, required): The name of the ECS cluster.
 * `--service` (string, optional): Filter tasks by service name.
+
+### 4. List Task Definitions
+
+List task definition families and revisions. The default status is `ACTIVE`:
+
+```bash
+ecsctl list task-definitions [--status ACTIVE|INACTIVE|DELETE_IN_PROGRESS] [--wide]
+```
 
 ---
 
