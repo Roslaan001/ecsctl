@@ -1015,10 +1015,7 @@ func (c *Client) ExecInTask(ctx context.Context, opts ExecOptions) error {
 func (c *Client) ListClusters(ctx context.Context, options ListOptions, wide bool) error {
 	var nextToken *string
 	rows := make([]map[string]any, 0)
-	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"services", "SERVICES"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"capacityProviders", "CAPACITY PROVIDERS"}}
-	if wide {
-		columns = append(columns, ListColumn{"arn", "ARN"})
-	}
+	columns := ClusterListColumns(wide)
 	for {
 		listOut, err := c.ecs.ListClusters(ctx, &ecs.ListClustersInput{NextToken: nextToken})
 		if err != nil {
@@ -1030,7 +1027,13 @@ func (c *Client) ListClusters(ctx context.Context, options ListOptions, wide boo
 				return fmt.Errorf("describing clusters: %w", err)
 			}
 			for _, cl := range descOut.Clusters {
-				rows = append(rows, map[string]any{"name": aws.ToString(cl.ClusterName), "status": aws.ToString(cl.Status), "services": cl.ActiveServicesCount, "running": cl.RunningTasksCount, "pending": cl.PendingTasksCount, "capacityProviders": strings.Join(cl.CapacityProviders, ","), "arn": aws.ToString(cl.ClusterArn)})
+				arn := aws.ToString(cl.ClusterArn)
+				metadata := options.Metadata[arn]
+				var trackedAt any
+				if !metadata.CreatedAt.IsZero() {
+					trackedAt = metadata.CreatedAt
+				}
+				rows = append(rows, map[string]any{"name": aws.ToString(cl.ClusterName), "status": aws.ToString(cl.Status), "services": cl.ActiveServicesCount, "running": cl.RunningTasksCount, "pending": cl.PendingTasksCount, "capacityProviders": strings.Join(cl.CapacityProviders, ","), "region": c.region, "createdBy": metadata.CreatedBy, "trackedAt": trackedAt, "arn": arn})
 			}
 		}
 		if listOut.NextToken == nil {
@@ -1045,10 +1048,7 @@ func (c *Client) ListClusters(ctx context.Context, options ListOptions, wide boo
 func (c *Client) ListServices(ctx context.Context, clusterName string, options ListOptions, wide bool) error {
 	var nextToken *string
 	rows := make([]map[string]any, 0)
-	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"health", "HEALTH"}, {"deployment", "DEPLOYMENT"}, {"desired", "DESIRED"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"launchType", "LAUNCH TYPE"}, {"taskDefinition", "TASK DEFINITION"}, {"createdAt", "CREATED AT"}}
-	if wide {
-		columns = append(columns, ListColumn{"arn", "SERVICE ARN"}, ListColumn{"taskDefinitionArn", "TASK DEFINITION ARN"})
-	}
+	columns := ServiceListColumns(wide)
 	for {
 		listOut, err := c.ecs.ListServices(ctx, &ecs.ListServicesInput{Cluster: aws.String(clusterName), NextToken: nextToken})
 		if err != nil {
@@ -1092,7 +1092,13 @@ func (c *Client) ListServices(ctx context.Context, clusterName string, options L
 						createdAt = *svc.CreatedAt
 					}
 					tdARN := aws.ToString(svc.TaskDefinition)
-					rows = append(rows, map[string]any{"name": aws.ToString(svc.ServiceName), "status": aws.ToString(svc.Status), "health": health, "deployment": deployment, "desired": svc.DesiredCount, "running": svc.RunningCount, "pending": svc.PendingCount, "launchType": string(svc.LaunchType), "taskDefinition": shortTaskDefinitionARN(tdARN), "createdAt": createdAt, "arn": aws.ToString(svc.ServiceArn), "taskDefinitionArn": tdARN})
+					arn := aws.ToString(svc.ServiceArn)
+					metadata := options.Metadata[arn]
+					var trackedAt any
+					if !metadata.CreatedAt.IsZero() {
+						trackedAt = metadata.CreatedAt
+					}
+					rows = append(rows, map[string]any{"name": aws.ToString(svc.ServiceName), "status": aws.ToString(svc.Status), "health": health, "deployment": deployment, "desired": svc.DesiredCount, "running": svc.RunningCount, "pending": svc.PendingCount, "launchType": string(svc.LaunchType), "taskDefinition": shortTaskDefinitionARN(tdARN), "createdAt": createdAt, "cluster": clusterName, "region": c.region, "createdBy": metadata.CreatedBy, "trackedAt": trackedAt, "arn": arn, "taskDefinitionArn": tdARN})
 				}
 			}
 		}
