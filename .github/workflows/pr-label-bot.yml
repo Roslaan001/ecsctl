@@ -6,8 +6,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   commit-message-label:
@@ -36,7 +35,9 @@ jobs:
           fi
 
           commits_endpoint="repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits"
-          messages="$(gh api --paginate "$commits_endpoint" --jq '.[].commit.message | @base64')"
+          # Match scripts/check-commit-messages.sh: merge commits are not
+          # subject to the Conventional Commit rule.
+          messages="$(gh api --paginate "$commits_endpoint" --jq '.[] | select((.parents | length) < 2) | .commit.message | @base64')"
           invalid=false
 
           while IFS= read -r encoded_message; do

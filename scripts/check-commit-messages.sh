@@ -9,8 +9,13 @@ git fetch --no-tags origin "+refs/heads/$default_branch:refs/remotes/origin/$def
 
 if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
 	commit_range="origin/$default_branch..$after"
-else
+elif git merge-base --is-ancestor "$before" "$after"; then
 	commit_range="$before..$after"
+else
+	# After a force-push, the previous tip may not be in the new history.
+	# Validate the new branch commits against the default branch instead.
+	printf 'Previous branch tip is not an ancestor; validating against %s.\n' "$default_branch"
+	commit_range="origin/$default_branch..$after"
 fi
 
 # A branch push can include a merge from the default branch. Don't revalidate
