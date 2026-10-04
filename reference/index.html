@@ -1,0 +1,2163 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A CLI tool for managing Amazon ECS resources, inspired by eksctl.">
+      
+      
+        <meta name="author" content="Roslaan001">
+      
+      
+        <link rel="canonical" href="https://roslaan001.github.io/ecsctl/reference/">
+      
+      
+        <link rel="prev" href="../state/">
+      
+      
+        <link rel="next" href="../releases/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>CLI Reference - ecsctl</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cli-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ecsctl" class="md-header__button md-logo" aria-label="ecsctl" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ecsctl
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CLI Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../uninstallation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Uninstallation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../declarative/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Declarative Management
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../express/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  ECS Express Mode
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../commands/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Operations & Commands
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../tasks/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Task Definitions and One-off Tasks
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../inspection/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resource Inspection
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../state/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Remote State
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../releases/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Release Notes and Upgrades
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ecsctl" class="md-nav__button md-logo" aria-label="ecsctl" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ecsctl
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uninstallation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uninstallation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../declarative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Declarative Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../express/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ECS Express Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Task Definitions and One-off Tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resource-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resource commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resource commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="create">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create service
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#describe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rollback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task operations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standalone-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone tasks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Standalone tasks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-task-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run-task flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-task-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop-task flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ecs-express-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECS Express Mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell completion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        version
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes and Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resource-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resource commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Resource commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="create">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create service
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#describe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        describe
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        deploy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rollback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task operations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standalone-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone tasks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Standalone tasks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-task-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run-task flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-task-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stop-task flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ecs-express-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECS Express Mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell completion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        version
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="cli-reference">CLI Reference</h1>
+<p>Use this page to find a command, its common syntax, and the flags it accepts. For step-by-step examples, see the <a href="../">guides</a>.</p>
+<h2 id="commands-at-a-glance">Commands at a glance</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apply</code></td>
+<td>Create or update resources from YAML.</td>
+</tr>
+<tr>
+<td><code>create</code></td>
+<td>Create a cluster or service.</td>
+</tr>
+<tr>
+<td><code>delete</code></td>
+<td>Delete a cluster or service.</td>
+</tr>
+<tr>
+<td><code>describe</code></td>
+<td>Show a cluster or service.</td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td>List clusters, services, or tasks.</td>
+</tr>
+<tr>
+<td><code>deploy</code></td>
+<td>Roll out a new service image.</td>
+</tr>
+<tr>
+<td><code>rollback</code></td>
+<td>Restore the task definition from the previous completed service deployment.</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>Change a service's desired task count.</td>
+</tr>
+<tr>
+<td><code>logs</code></td>
+<td>Read or follow service logs.</td>
+</tr>
+<tr>
+<td><code>exec</code></td>
+<td>Open a shell or run a command in a task.</td>
+</tr>
+<tr>
+<td><code>express</code></td>
+<td>Manage ECS Express Mode services.</td>
+</tr>
+<tr>
+<td><code>register task-definition</code></td>
+<td>Register a task definition from JSON.</td>
+</tr>
+<tr>
+<td><code>run-task</code> / <code>stop-task</code></td>
+<td>Start or stop standalone tasks.</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td>Manage remote state and tracked resources.</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>Print build information; <code>--check</code> checks for a newer GitHub release.</td>
+</tr>
+<tr>
+<td><code>completion</code></td>
+<td>Install shell autocompletion.</td>
+</tr>
+<tr>
+<td><code>help</code></td>
+<td>Show help for a command.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="global-flags">Global flags</h2>
+<p>These flags can be used with any command or subcommand.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--region</code></td>
+<td>string</td>
+<td>AWS region to target, such as <code>us-east-1</code>. Overrides environment settings.</td>
+</tr>
+<tr>
+<td><code>--profile</code></td>
+<td>string</td>
+<td>AWS profile to use from <code>~/.aws/credentials</code>.</td>
+</tr>
+<tr>
+<td><code>--context</code></td>
+<td>string</td>
+<td>Remote state context to use for this command.</td>
+</tr>
+<tr>
+<td><code>-h, --help</code></td>
+<td>boolean</td>
+<td>Show help for the current command.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="resource-commands">Resource commands</h2>
+<h3 id="apply"><code>apply</code></h3>
+<p>Create a cluster, ECS service, or Express service from YAML, or update configured fields on an existing resource.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ecsctl apply -f FILE [--dry-run] [--wait]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-f, --file</code></td>
+<td>string</td>
+<td>YAML configuration file. Required.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>boolean</td>
+<td>Show the planned changes without applying them.</td>
+</tr>
+<tr>
+<td><code>--wait</code></td>
+<td>boolean</td>
+<td>Wait for the resource to reach a stable state.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="create"><code>create</code></h3>
+<p>Create a cluster or regular ECS service. Express services are created with <code>express create</code>.</p>
+<h4 id="create-cluster"><code>create cluster</code></h4>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ecsctl create cluster -f FILE
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ecsctl create cluster --name NAME [--region REGION] [--capacity-providers LIST]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-f, --file</code></td>
+<td>string</td>
+<td>YAML configuration file.</td>
+</tr>
+<tr>
+<td><code>--name</code></td>
+<td>string</td>
+<td>Cluster name. Required when <code>-f</code> is omitted.</td>
+</tr>
+<tr>
+<td><code>--region</code></td>
+<td>string</td>
+<td>AWS region.</td>
+</tr>
+<tr>
+<td><code>--capacity-providers</code></td>
+<td>string slice</td>
+<td>Capacity providers, such as <code>FARGATE,FARGATE_SPOT</code>. Defaults to <code>FARGATE</code>; incompatible with <code>--ec2</code>.</td>
+</tr>
+<tr>
+<td><code>--ec2</code></td>
+<td>boolean</td>
+<td>Create an EC2-backed cluster in the default VPC.</td>
+</tr>
+<tr>
+<td><code>--ec2-instance-type</code></td>
+<td>string</td>
+<td>EC2 instance type for <code>--ec2</code>. Defaults to <code>t3.small</code>.</td>
+</tr>
+<tr>
+<td><code>--ec2-count</code></td>
+<td>int</td>
+<td>Initial EC2 instance count for <code>--ec2</code>. Defaults to <code>1</code>.</td>
+</tr>
+<tr>
+<td><code>--tags</code></td>
+<td>string array</td>
+<td>Tags in <code>key=value</code> form.</td>
+</tr>
+</tbody>
+</table>
+<p>Without <code>--ec2</code>, new clusters default to Fargate. EC2-backed clusters default to EC2 capacity; creating and running instances incurs AWS charges.</p>
+<h4 id="create-service"><code>create service</code></h4>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ecsctl create service -f FILE
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ecsctl create service --name NAME --cluster CLUSTER --task-definition FAMILY:REV
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-f, --file</code></td>
+<td>string</td>
+<td>YAML configuration file.</td>
+</tr>
+<tr>
+<td><code>--name</code></td>
+<td>string</td>
+<td>Service name. Required when <code>-f</code> is omitted.</td>
+</tr>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Cluster name. Required when <code>-f</code> is omitted.</td>
+</tr>
+<tr>
+<td><code>--task-definition</code></td>
+<td>string</td>
+<td>Task definition family and revision. Required when <code>-f</code> is omitted.</td>
+</tr>
+<tr>
+<td><code>--launch-type</code></td>
+<td>string</td>
+<td><code>FARGATE</code> or <code>EC2</code>. Defaults to the cluster's capacity-provider strategy.</td>
+</tr>
+<tr>
+<td><code>--scheduling-strategy</code></td>
+<td>string</td>
+<td><code>REPLICA</code> or <code>DAEMON</code>. Defaults to <code>REPLICA</code>.</td>
+</tr>
+<tr>
+<td><code>--desired-count</code></td>
+<td>int</td>
+<td>Number of tasks to run. Defaults to <code>1</code>.</td>
+</tr>
+<tr>
+<td><code>--subnets</code></td>
+<td>string slice</td>
+<td>Subnet IDs.</td>
+</tr>
+<tr>
+<td><code>--security-groups</code></td>
+<td>string slice</td>
+<td>Security group IDs.</td>
+</tr>
+<tr>
+<td><code>--assign-public-ip</code></td>
+<td>string</td>
+<td><code>ENABLED</code> or <code>DISABLED</code>. Defaults to <code>ENABLED</code>.</td>
+</tr>
+<tr>
+<td><code>--tags</code></td>
+<td>string array</td>
+<td>Tags in <code>key=value</code> form.</td>
+</tr>
+<tr>
+<td><code>--wait</code></td>
+<td>boolean</td>
+<td>Wait for the service to reach steady state.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="delete"><code>delete</code></h3>
+<p>Delete a resource by name.</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Flags</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ecsctl delete cluster NAME</code></td>
+<td>Optional <code>--force</code> to delete its services first; <code>--dry-run</code> previews; <code>--yes</code> confirms non-interactive deletion.</td>
+</tr>
+<tr>
+<td><code>ecsctl delete service NAME</code></td>
+<td>Required <code>--cluster CLUSTER</code>; <code>--dry-run</code> previews; <code>--yes</code> confirms non-interactive deletion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="describe"><code>describe</code></h3>
+<p>Show live configuration and runtime status.</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Required flags</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ecsctl describe cluster NAME</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ecsctl describe service NAME</code></td>
+<td><code>--cluster CLUSTER</code></td>
+</tr>
+<tr>
+<td><code>ecsctl describe task TASK</code></td>
+<td><code>--cluster CLUSTER</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="list"><code>list</code></h3>
+<p>Cluster and service lists query live AWS by default and add tracking metadata from remote state when available. Use <code>--state</code> to list only saved resources; the legacy <code>--live</code> flag is still accepted.</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Flags</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ecsctl list clusters</code></td>
+<td><code>--state</code>, <code>--live</code>, <code>--wide</code>, <code>--name PREFIX</code>, <code>--status STATUS</code></td>
+</tr>
+<tr>
+<td><code>ecsctl list services</code></td>
+<td><code>--cluster CLUSTER</code>, <code>--state</code>, <code>--live</code>, <code>--wide</code>, <code>--name PREFIX</code>, <code>--status STATUS</code></td>
+</tr>
+<tr>
+<td><code>ecsctl list tasks</code></td>
+<td><code>--cluster CLUSTER</code>, optional <code>--service NAME</code>, <code>--name PREFIX</code>, <code>--status STATUS</code>, <code>--desired-status STATUS</code>, <code>--launch-type TYPE</code>, <code>--wide</code></td>
+</tr>
+<tr>
+<td><code>ecsctl list task-definitions</code></td>
+<td><code>--status STATUS</code>, <code>--family PREFIX</code>, <code>--wide</code></td>
+</tr>
+</tbody>
+</table>
+<p>All list commands support <code>--output table|json</code>, <code>--sort FIELD</code>, and <code>--limit N</code>. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and AWS creation time. Cluster/service results include tracking metadata when available. State-only mode uses the same output fields, with null live fields. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. <code>--status</code> filters use live AWS and cannot be combined with <code>--state</code>. JSON output includes ARNs; <code>--wide</code> adds ARNs to table output. Task definitions list active revisions by default; <code>--status</code> also accepts <code>INACTIVE</code> and <code>DELETE_IN_PROGRESS</code>.</p>
+<h3 id="deploy"><code>deploy</code></h3>
+<p>Roll out a new image for a service.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ecsctl deploy SERVICE --cluster CLUSTER --image IMAGE [--container NAME]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>--image</code></td>
+<td>string</td>
+<td>New image and tag, such as <code>nginx:latest</code>. Required.</td>
+</tr>
+<tr>
+<td><code>--container</code></td>
+<td>string</td>
+<td>Container to update. Defaults to the first container.</td>
+</tr>
+<tr>
+<td><code>--wait</code></td>
+<td>boolean</td>
+<td>Wait for the deployment to complete.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rollback"><code>rollback</code></h3>
+<p>Restore the most recent completed deployment that used a different task definition.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ecsctl rollback SERVICE --cluster CLUSTER [--wait]
+</span></code></pre></div>
+<p><code>--wait</code> polls until the rollback deployment is stable. Rollback supports ECS
+rolling deployment controllers; CodeDeploy and external controllers are rejected.
+Use <code>ecsctl describe service SERVICE --cluster CLUSTER</code> to inspect deployment
+task definitions, creation times, and rollout reasons before or after rollback.</p>
+<h3 id="scale"><code>scale</code></h3>
+<p>Set the desired task count for a service.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ecsctl scale SERVICE --cluster CLUSTER --desired COUNT
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>--desired</code></td>
+<td>integer</td>
+<td>Desired number of tasks. Required.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="task-operations">Task operations</h2>
+<h3 id="logs"><code>logs</code></h3>
+<p>Read or follow logs from a service's tasks.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ecsctl logs SERVICE --cluster CLUSTER [--follow] [--tail LINES]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>-f, --follow</code></td>
+<td>boolean</td>
+<td>Stream new log lines.</td>
+</tr>
+<tr>
+<td><code>--tail</code></td>
+<td>integer</td>
+<td>Number of recent lines to show. Defaults to <code>50</code>.</td>
+</tr>
+<tr>
+<td><code>--container</code></td>
+<td>string</td>
+<td>Container name. Defaults to the first container.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="exec"><code>exec</code></h3>
+<p>Open a shell or run a command in a task for a service.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ecsctl exec SERVICE --cluster CLUSTER [--container NAME] [--command COMMAND] [--task TASK]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>--container</code></td>
+<td>string</td>
+<td>Container name.</td>
+</tr>
+<tr>
+<td><code>--command</code></td>
+<td>string</td>
+<td>Command to run. Defaults to a shell.</td>
+</tr>
+<tr>
+<td><code>--task</code></td>
+<td>string</td>
+<td>Specific task to use. Otherwise, ecsctl selects a running task.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="standalone-tasks">Standalone tasks</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Syntax</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>register task-definition</code></td>
+<td><code>ecsctl register task-definition -f FILE</code></td>
+<td>Register a task definition JSON document.</td>
+</tr>
+<tr>
+<td><code>run-task</code></td>
+<td><code>ecsctl run-task --cluster CLUSTER --task-definition FAMILY:REV</code></td>
+<td>Start standalone tasks. See its flags below.</td>
+</tr>
+<tr>
+<td><code>stop-task</code></td>
+<td><code>ecsctl stop-task --cluster CLUSTER --task TASK_ID_OR_ARN</code></td>
+<td>Stop a running task. Supports <code>--reason</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="run-task-flags"><code>run-task</code> flags</h4>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>--task-definition</code></td>
+<td>string</td>
+<td>Task definition family and revision, or ARN. Required.</td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td>int</td>
+<td>Number of tasks to start. Defaults to <code>1</code>.</td>
+</tr>
+<tr>
+<td><code>--launch-type</code></td>
+<td>string</td>
+<td><code>FARGATE</code> or <code>EC2</code>. Defaults to the cluster's capacity-provider strategy.</td>
+</tr>
+<tr>
+<td><code>--subnets</code></td>
+<td>string slice</td>
+<td>Subnet IDs.</td>
+</tr>
+<tr>
+<td><code>--security-groups</code></td>
+<td>string slice</td>
+<td>Security group IDs.</td>
+</tr>
+<tr>
+<td><code>--assign-public-ip</code></td>
+<td>string</td>
+<td><code>ENABLED</code> or <code>DISABLED</code>. Defaults to <code>DISABLED</code>.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="stop-task-flags"><code>stop-task</code> flags</h4>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--cluster</code></td>
+<td>string</td>
+<td>Target cluster. Required.</td>
+</tr>
+<tr>
+<td><code>--task</code></td>
+<td>string</td>
+<td>Task ID or ARN. Required.</td>
+</tr>
+<tr>
+<td><code>--reason</code></td>
+<td>string</td>
+<td>Stop reason. Defaults to <code>Stopped by ecsctl</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ecs-express-mode">ECS Express Mode</h2>
+<p>Manage ECS Express Mode services. See the <a href="../express/">Express Mode guide</a> for details.</p>
+<table>
+<thead>
+<tr>
+<th>Subcommand</th>
+<th>Syntax</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create</code></td>
+<td><code>ecsctl express create -f FILE [--wait]</code></td>
+<td>Create from YAML. <code>-f</code> is required; <code>--wait</code> defaults to <code>true</code>. Include <code>serviceName</code>, <code>infrastructureRoleArn</code>, and either <code>image</code> or <code>taskDefinitionArn</code>.</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td><code>ecsctl express update --service-arn ARN -f FILE [--wait]</code></td>
+<td>Update from YAML. <code>--service-arn</code> and <code>-f</code> are required; <code>--wait</code> defaults to <code>true</code>.</td>
+</tr>
+<tr>
+<td><code>describe</code></td>
+<td><code>ecsctl express describe --service-arn ARN</code></td>
+<td>Show service status. <code>--service-arn</code> is required.</td>
+</tr>
+<tr>
+<td><code>delete</code></td>
+<td><code>ecsctl express delete --service-arn ARN</code></td>
+<td>Begin managed service deletion. <code>--service-arn</code> is required.</td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td><code>ecsctl express list [--cluster NAME]</code></td>
+<td>List Express Mode services. <code>--cluster</code> defaults to the default cluster.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="remote-state">Remote state</h2>
+<p>Use <code>state</code> to manage remote state contexts and tracked resources.</p>
+<table>
+<thead>
+<tr>
+<th>Subcommand</th>
+<th>Syntax</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>init</code></td>
+<td><code>ecsctl state init --context NAME --bucket BUCKET --region REGION</code></td>
+<td>Initialize a context. <code>--bucket</code> and <code>--region</code> are required. <code>--context</code> defaults to <code>default</code>; <code>--key</code> defaults to the context name. Optional flags: <code>--profile</code>, <code>--kms-key-id</code>.</td>
+</tr>
+<tr>
+<td><code>list-contexts</code></td>
+<td><code>ecsctl state list-contexts</code></td>
+<td>List configured contexts.</td>
+</tr>
+<tr>
+<td><code>use-context</code></td>
+<td><code>ecsctl state use-context NAME</code></td>
+<td>Switch the active context.</td>
+</tr>
+<tr>
+<td><code>import cluster</code></td>
+<td><code>ecsctl state import cluster NAME</code></td>
+<td>Import a cluster. Supports <code>--context</code> to select a context.</td>
+</tr>
+<tr>
+<td><code>import service</code></td>
+<td><code>ecsctl state import service NAME --cluster CLUSTER</code></td>
+<td>Import a service. <code>--cluster</code> is required; supports <code>--context</code>.</td>
+</tr>
+<tr>
+<td><code>import express</code></td>
+<td><code>ecsctl state import express NAME_OR_ARN [--cluster CLUSTER]</code></td>
+<td>Import an Express service and capture its configuration. Supports <code>--context</code>.</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td><code>ecsctl state config RESOURCE NAME [--cluster CLUSTER]</code></td>
+<td>Print captured YAML. Use <code>--cluster</code> to select a service in a cluster; an active context is required.</td>
+</tr>
+<tr>
+<td><code>show</code></td>
+<td><code>ecsctl state show</code></td>
+<td>Show the active context and tracked resources.</td>
+</tr>
+<tr>
+<td><code>drift</code></td>
+<td><code>ecsctl state drift</code></td>
+<td>Compare tracked configuration with live ECS resources.</td>
+</tr>
+<tr>
+<td><code>unlock</code></td>
+<td><code>ecsctl state unlock --force</code></td>
+<td>Remove a stale lock after confirming no operation is active.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="shell-completion">Shell completion</h2>
+<p>Install completion for the shell you use, then restart your shell:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>ecsctl completion bash
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>ecsctl completion zsh
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>ecsctl completion fish
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>ecsctl completion powershell
+</span></code></pre></div>
+<p>For help with a specific command or its flags, run:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ecsctl --help
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ecsctl create service --help
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>ecsctl help state import
+</span></code></pre></div>
+<h2 id="version"><code>version</code></h2>
+<p>Print the ecsctl version, commit, and build information. Pass <code>--check</code> to check
+the latest stable GitHub release and get the platform's install command if an
+update is available. This check requires an internet connection and does not
+modify the installed binary.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
