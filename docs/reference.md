@@ -102,8 +102,8 @@ Delete a resource by name.
 
 | Syntax | Flags |
 |---|---|
-| `ecsctl delete cluster NAME` | Optional `--force` to delete its services first. |
-| `ecsctl delete service NAME` | Required `--cluster CLUSTER`. |
+| `ecsctl delete cluster NAME` | Optional `--force` to delete its services first; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
+| `ecsctl delete service NAME` | Required `--cluster CLUSTER`; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
 
 ### `describe`
 

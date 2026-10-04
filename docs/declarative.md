@@ -234,6 +234,16 @@ ecsctl delete service my-service --cluster my-cluster
 
 # Delete a cluster by name
 ecsctl delete cluster my-cluster
+
+# Preview a deletion without calling AWS
+ecsctl delete service my-service --cluster my-cluster --dry-run
+
+# Confirm an automated deletion explicitly
+ecsctl delete cluster my-cluster --yes
 ```
 
-Deleting a service stops its running tasks. Deleting a cluster requires it to contain no services or other resources that prevent deletion.
+Interactive deletion asks you to type the resource name. In non-interactive use, pass
+`--yes` to confirm explicitly. Use `--dry-run` to preview the requested deletion
+without calling AWS. Deleting a service drains and stops its running tasks. Deleting
+a cluster requires it to contain no services or other resources that prevent
+deletion; `--force` drains and deletes its services first.
