@@ -15,6 +15,7 @@ import (
 var (
 	listCluster       string
 	listLive          bool
+	listStateOnly     bool
 	listWide          bool
 	listName          string
 	listStatusFilter  string
@@ -57,36 +58,28 @@ var listClustersCmd = &cobra.Command{
 		}
 		ctx := context.Background()
 
-		// Try state first unless the caller explicitly requests live AWS data.
-		if !listLive && listStatusFilter == "" {
-			resources, ok := listClustersFromState(ctx)
-			if ok {
-				rows := make([]map[string]any, 0, len(resources))
-				for _, r := range resources {
-					var createdAt any
-					if !r.CreatedAt.IsZero() {
-						createdAt = r.CreatedAt
-					}
-					rows = append(rows, map[string]any{"name": r.Name, "region": r.Region, "createdBy": r.CreatedBy, "createdAt": createdAt, "arn": r.ARN})
-				}
-				columns := []aws.ListColumn{{Key: "name", Title: "NAME"}, {Key: "region", Title: "REGION"}, {Key: "createdBy", Title: "CREATED BY"}, {Key: "createdAt", Title: "CREATED AT"}}
-				if listWide {
-					columns = append(columns, aws.ListColumn{Key: "arn", Title: "ARN"})
-				}
-				if err := aws.RenderList(rows, columns, options); err != nil {
-					return err
-				}
-				if !strings.EqualFold(listOutput, "json") {
-					fmt.Println("\n(source: remote state)")
-				}
-				return nil
+		resources, hasState := listClustersFromState(ctx)
+		if listStateOnly {
+			if listLive {
+				return fmt.Errorf("--state and --live cannot be used together")
 			}
+			if !hasState {
+				return fmt.Errorf("no active remote state inventory is available; configure a context with 'ecsctl state init'")
+			}
+			if listStatusFilter != "" {
+				return fmt.Errorf("--status requires live AWS data; omit --state")
+			}
+			if err := aws.RenderList(clusterStateRows(resources), aws.ClusterListColumns(listWide), options); err != nil {
+				return err
+			}
+			if !strings.EqualFold(listOutput, "json") {
+				fmt.Println("\n(source: remote state; live AWS fields are unavailable)")
+			}
+			return nil
 		}
 
 		// Fall back to live AWS
-		if !strings.EqualFold(listOutput, "json") {
-			fmt.Println("(querying live AWS)")
-		}
+		options.Metadata = listMetadata(resources)
 		client, err := aws.NewECSClient(ctx, region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
@@ -94,6 +87,9 @@ var listClustersCmd = &cobra.Command{
 		if err := client.ListClusters(ctx, options, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
+		}
+		if !strings.EqualFold(listOutput, "json") {
+			fmt.Println("\n(source: live AWS; tracking metadata from remote state where available)")
 		}
 		return nil
 	},
@@ -111,32 +107,28 @@ var listServicesCmd = &cobra.Command{
 		}
 		ctx := context.Background()
 
-		// Try state first unless the caller explicitly requests live AWS data.
-		if !listLive && listStatusFilter == "" {
-			resources, ok := listServicesFromState(ctx, listCluster)
-			if ok {
-				rows := make([]map[string]any, 0, len(resources))
-				for _, r := range resources {
-					rows = append(rows, map[string]any{"name": r.Name, "cluster": r.Cluster, "region": r.Region, "createdBy": r.CreatedBy, "arn": r.ARN})
-				}
-				columns := []aws.ListColumn{{Key: "name", Title: "NAME"}, {Key: "cluster", Title: "CLUSTER"}, {Key: "region", Title: "REGION"}, {Key: "createdBy", Title: "CREATED BY"}}
-				if listWide {
-					columns = append(columns, aws.ListColumn{Key: "arn", Title: "ARN"})
-				}
-				if err := aws.RenderList(rows, columns, options); err != nil {
-					return err
-				}
-				if !strings.EqualFold(listOutput, "json") {
-					fmt.Println("\n(source: remote state)")
-				}
-				return nil
+		resources, hasState := listServicesFromState(ctx, listCluster)
+		if listStateOnly {
+			if listLive {
+				return fmt.Errorf("--state and --live cannot be used together")
 			}
+			if !hasState {
+				return fmt.Errorf("no active remote state inventory is available; configure a context with 'ecsctl state init'")
+			}
+			if listStatusFilter != "" {
+				return fmt.Errorf("--status requires live AWS data; omit --state")
+			}
+			if err := aws.RenderList(serviceStateRows(resources), aws.ServiceListColumns(listWide), options); err != nil {
+				return err
+			}
+			if !strings.EqualFold(listOutput, "json") {
+				fmt.Println("\n(source: remote state; live AWS fields are unavailable)")
+			}
+			return nil
 		}
 
 		// Fall back to live AWS
-		if !strings.EqualFold(listOutput, "json") {
-			fmt.Println("(querying live AWS)")
-		}
+		options.Metadata = listMetadata(resources)
 		client, err := aws.NewECSClient(ctx, region, profile)
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
@@ -144,6 +136,9 @@ var listServicesCmd = &cobra.Command{
 		if err := client.ListServices(ctx, listCluster, options, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
+		}
+		if !strings.EqualFold(listOutput, "json") {
+			fmt.Println("\n(source: live AWS; tracking metadata from remote state where available)")
 		}
 		return nil
 	},
@@ -153,7 +148,7 @@ var listServicesCmd = &cobra.Command{
 // Returns (nil, false) if no state is configured.
 func listClustersFromState(ctx context.Context) ([]state.Resource, bool) {
 	localCfg, err := localconfig.Load()
-	if err != nil || localCfg.CurrentContext == "" {
+	if err != nil || (localCfg.CurrentContext == "" && stateContext == "") {
 		return nil, false
 	}
 	_, activeCtx, err := localCfg.GetActiveContext(stateContext)
@@ -177,7 +172,7 @@ func listClustersFromState(ctx context.Context) ([]state.Resource, bool) {
 // listServicesFromState returns services from remote state, optionally filtered by cluster.
 func listServicesFromState(ctx context.Context, cluster string) ([]state.Resource, bool) {
 	localCfg, err := localconfig.Load()
-	if err != nil || localCfg.CurrentContext == "" {
+	if err != nil || (localCfg.CurrentContext == "" && stateContext == "") {
 		return nil, false
 	}
 	_, activeCtx, err := localCfg.GetActiveContext(stateContext)
@@ -198,8 +193,43 @@ func listServicesFromState(ctx context.Context, cluster string) ([]state.Resourc
 	return st.FindServices(cluster), true
 }
 
+func listMetadata(resources []state.Resource) map[string]aws.ResourceMetadata {
+	metadata := make(map[string]aws.ResourceMetadata, len(resources))
+	for _, resource := range resources {
+		if resource.ARN == "" {
+			continue
+		}
+		metadata[resource.ARN] = aws.ResourceMetadata{CreatedBy: resource.CreatedBy, CreatedAt: resource.CreatedAt}
+	}
+	return metadata
+}
+
+func clusterStateRows(resources []state.Resource) []map[string]any {
+	rows := make([]map[string]any, 0, len(resources))
+	for _, resource := range resources {
+		var trackedAt any
+		if !resource.CreatedAt.IsZero() {
+			trackedAt = resource.CreatedAt
+		}
+		rows = append(rows, map[string]any{"name": resource.Name, "status": nil, "services": nil, "running": nil, "pending": nil, "capacityProviders": nil, "region": resource.Region, "createdBy": resource.CreatedBy, "trackedAt": trackedAt, "arn": resource.ARN})
+	}
+	return rows
+}
+
+func serviceStateRows(resources []state.Resource) []map[string]any {
+	rows := make([]map[string]any, 0, len(resources))
+	for _, resource := range resources {
+		var trackedAt any
+		if !resource.CreatedAt.IsZero() {
+			trackedAt = resource.CreatedAt
+		}
+		rows = append(rows, map[string]any{"name": resource.Name, "status": nil, "health": nil, "deployment": nil, "desired": nil, "running": nil, "pending": nil, "launchType": nil, "taskDefinition": nil, "createdAt": nil, "cluster": resource.Cluster, "region": resource.Region, "createdBy": resource.CreatedBy, "trackedAt": trackedAt, "arn": resource.ARN, "taskDefinitionArn": nil})
+	}
+	return rows
+}
+
 func init() {
-	listCmd.PersistentFlags().BoolVar(&listLive, "live", false, "Query AWS directly instead of listing the saved state inventory")
+	listCmd.PersistentFlags().BoolVar(&listLive, "live", false, "Explicitly query AWS (the default; use --state for saved inventory)")
 	listCmd.PersistentFlags().BoolVar(&listWide, "wide", false, "Include full ARNs in list output")
 	listCmd.PersistentFlags().StringVar(&listOutput, "output", "table", "List output format: table or json")
 	listCmd.PersistentFlags().StringVar(&listSort, "sort", "", "Sort results by a displayed field")
@@ -209,6 +239,8 @@ func init() {
 	listClustersCmd.Flags().StringVar(&listStatusFilter, "status", "", "Filter by cluster status")
 	listServicesCmd.Flags().StringVar(&listName, "name", "", "Filter by service name prefix")
 	listServicesCmd.Flags().StringVar(&listStatusFilter, "status", "", "Filter by service status")
+	listClustersCmd.Flags().BoolVar(&listStateOnly, "state", false, "List the saved state inventory instead of querying AWS")
+	listServicesCmd.Flags().BoolVar(&listStateOnly, "state", false, "List the saved state inventory instead of querying AWS")
 	_ = listServicesCmd.MarkFlagRequired("cluster")
 
 	listCmd.AddCommand(listClustersCmd)
