@@ -122,7 +122,7 @@ Copy-Item -Path $ExeSource -Destination $ExeDestination -Force
 Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
 
 Write-Host "Successfully installed ecsctl to $ExeDestination"
-Write-Host "Tip: Run 'ecsctl completion powershell' to set up shell autocompletions!"
+Write-Host "Tip: Run 'ecsctl completion powershell' to install PowerShell autocompletion."
 
 # Add to user PATH if not already present
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")

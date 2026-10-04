@@ -160,7 +160,7 @@ else
 fi
 
 echo "Successfully installed ecsctl to $TARGET_DIR/$BINARY"
-echo "Tip: Run 'ecsctl completion [bash|zsh|fish]' to set up shell autocompletions!"
+echo "Tip: Run 'ecsctl completion bash', 'ecsctl completion zsh', or 'ecsctl completion fish' to install shell autocompletion."
 
 # Verify installation
 if command -v "$BINARY" >/dev/null 2>&1 || [ -x "$TARGET_DIR/$BINARY" ]; then

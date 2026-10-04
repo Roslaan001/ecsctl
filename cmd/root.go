@@ -41,6 +41,7 @@ func Execute() error {
 }
 
 func init() {
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.PersistentFlags().StringVar(&region, "region", "", "AWS region (overrides config/env)")
 	rootCmd.PersistentFlags().StringVar(&profile, "profile", "", "AWS profile to use")
 	rootCmd.PersistentFlags().StringVar(&stateContext, "context", "", "State context to use (overrides current context in ~/.ecsctl/config.yaml)")
@@ -56,4 +57,5 @@ func init() {
 	rootCmd.AddCommand(stateCmd)
 	rootCmd.AddCommand(describeCmd)
 	rootCmd.AddCommand(applyCmd)
+	rootCmd.AddCommand(completionCmd)
 }
