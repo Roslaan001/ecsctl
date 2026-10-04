@@ -6,11 +6,12 @@
 
 ## 🔍 Listing Resources (`list`)
 
-The `list` command displays lists of clusters, services, and tasks. If a remote state context is active, `list clusters` and `list services` show the saved inventory by default. Add `--live` to query AWS directly and see current resources, including resources changed or deleted outside ecsctl. Without a configured state context, the commands query AWS directly.
+The `list` command queries live AWS for clusters, services, tasks, and task definitions. When a remote state context is active, cluster and service results are enriched with ecsctl tracking metadata where a matching resource is tracked. Use `--state` on clusters or services to view only the saved inventory. This can include resources that are no longer present in AWS; live-only status and health fields are unavailable in state mode. `ecsctl state show` also displays the full saved inventory.
 
 ```bash
-ecsctl list clusters --live --region eu-west-2
-ecsctl list services --cluster production --live --region eu-west-2
+ecsctl list clusters --region eu-west-2
+ecsctl list services --cluster production --region eu-west-2
+ecsctl list clusters --state
 ecsctl list tasks --cluster production --wide --region eu-west-2
 ecsctl list task-definitions --status ACTIVE --wide --region eu-west-2
 ecsctl list services --cluster production --output json
@@ -18,9 +19,9 @@ ecsctl list tasks --cluster production --service api --desired-status STOPPED --
 ecsctl list task-definitions --family api --sort registeredAt --limit 10
 ```
 
-Live cluster lists show active services, running and pending tasks, and capacity providers. State-backed cluster lists also show the recorded creation time for clusters created through ecsctl. Live service lists include deployment health/state, desired/running/pending counts, launch type, task definition, and creation time. Task lists include health, desired and last status, service, launch type, CPU, memory, and timestamps. Task definition lists include CPU, memory, and registration time. Add `--wide` to include full ARNs.
+Live cluster lists show active services, running and pending tasks, capacity providers, and region. If the cluster is tracked, `TRACKED BY` and `TRACKED AT` show when ecsctl first recorded it; ECS does not provide a cluster creation timestamp, and imported clusters have no tracked creation time. Live service lists include deployment health/state, desired/running/pending counts, launch type, task definition, AWS creation time, and tracking metadata when available. State-only cluster and service lists use the same columns, with `-` for live-only fields. Task lists include health, desired and last status, service, launch type, CPU, memory, and timestamps. Task-definition lists include CPU, memory, and registration time. Add `--wide` to include full ARNs.
 
-All list commands accept `--output table|json`, `--sort FIELD`, and `--limit N` (`0` means no limit). `--sort` accepts a displayed field name, such as `name`, `createdAt`, `startedAt`, or `registeredAt`. Name and family filters match prefixes. Cluster and service `--status` filters query live AWS, as status is not part of the saved inventory. JSON output always includes ARN fields and emits only JSON on stdout.
+All list commands accept `--output table|json`, `--sort FIELD`, and `--limit N` (`0` means no limit). `--sort` accepts a displayed field name, such as `name`, `createdAt`, `trackedAt`, `startedAt`, or `registeredAt`. Name and family filters match prefixes. Cluster and service `--status` filters use live AWS and cannot be combined with `--state`. JSON output includes the same fields for live and state-only cluster/service lists, uses `null` for unavailable live fields, and emits only JSON on stdout. The legacy `--live` flag remains accepted; live AWS is now the default.
 
 ### 1. List Clusters
 List all ECS clusters:
@@ -91,4 +92,12 @@ ecsctl describe service <service-name> --cluster <cluster-name> [flags]
 #### Example
 ```bash
 ecsctl describe service my-service --cluster my-cluster
+```
+
+### 3. Describe Task
+
+Inspect a task's status, stop reason, container exit codes and reasons, timestamps, and network attachments:
+
+```bash
+ecsctl describe task <task-id-or-arn> --cluster <cluster-name>
 ```
