@@ -138,60 +138,16 @@ To use `ecsctl exec` (which allows you to run interactive shells inside ECS Farg
 
 ## Shell Autocompletion
 
-`ecsctl` supports generating autocompletion scripts for Bash, Zsh, Fish, and PowerShell on the fly. 
+`ecsctl completion` installs autocompletion for the selected shell. Run the matching command once after installing `ecsctl`, then restart your shell:
 
-### Bash
-
-To configure autocomplete for Bash:
-
-```bash
-# Set up autocomplete for the current session
-source <(ecsctl completion bash)
-
-# Make autocomplete persistent across shell sessions:
-# On Linux:
-ecsctl completion bash | sudo tee /etc/bash_completion.d/ecsctl > /dev/null
-
-# On macOS:
-ecsctl completion bash > /usr/local/etc/bash_completion.d/ecsctl
+```sh
+ecsctl completion bash
+ecsctl completion zsh
+ecsctl completion fish
+ecsctl completion powershell
 ```
 
-### Zsh
-
-To configure autocomplete for Zsh:
-
-```zsh
-# Set up autocomplete for the current session
-source <(ecsctl completion zsh)
-
-# Make autocomplete persistent across shell sessions:
-mkdir -p ~/.zsh/completion
-ecsctl completion zsh > ~/.zsh/completion/_ecsctl
-
-# Then ensure the directory is in your fpath by adding this to ~/.zshrc:
-fpath=(~/.zsh/completion $fpath)
-autoload -Uz compinit && compinit
-```
-
-### Fish
-
-To configure autocomplete for Fish:
-
-```fish
-ecsctl completion fish > ~/.config/fish/completions/ecsctl.fish
-```
-
-### PowerShell
-
-To configure autocomplete for Windows PowerShell:
-
-```powershell
-# Set up autocomplete for the current session
-ecsctl completion powershell | Out-String | Invoke-Expression
-
-# Make autocomplete persistent across sessions:
-ecsctl completion powershell >> $PROFILE
-```
+For Bash, Bash completion must be enabled in your shell. Zsh setup adds its completion directory and `compinit` to `~/.zshrc`. PowerShell setup adds the generated file to the standard user profile.
 
 ---
 

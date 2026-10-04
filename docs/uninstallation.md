@@ -31,7 +31,7 @@ Remove-Item -Recurse -Force $HOME\.ecsctl
 
 ## Cleaning up Shell Completions (Optional)
 
-If you generated autocompletions for your shell, you can remove them as well:
+If you installed shell autocompletion, you can remove its file as well:
 
 * **Bash**: `sudo rm -f /etc/bash_completion.d/ecsctl`
 * **Zsh**: `rm -f ~/.zsh/completion/_ecsctl`

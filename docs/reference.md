@@ -20,7 +20,7 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | `run-task` / `stop-task` | Start or stop standalone tasks. |
 | `state` | Manage remote state and tracked resources. |
 | `version` | Print build information. |
-| `completion` | Generate shell completion scripts. |
+| `completion` | Install shell autocompletion. |
 | `help` | Show help for a command. |
 
 ## Global flags
@@ -243,7 +243,7 @@ Use `state` to manage remote state contexts and tracked resources.
 
 ## Shell completion
 
-Generate a completion script for the shell you use:
+Install completion for the shell you use, then restart your shell:
 
 ```text
 ecsctl completion bash
