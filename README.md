@@ -243,6 +243,10 @@ ecsctl list services --cluster my-cluster
 ecsctl list tasks --cluster my-cluster
 ecsctl list tasks --cluster my-cluster --service my-service
 ecsctl list task-definitions
+
+# Filter, sort, limit, or emit machine-readable output
+ecsctl list tasks --cluster my-cluster --desired-status STOPPED --sort startedAt --limit 20
+ecsctl list task-definitions --family api --output json
 ```
 
 ### Describe
