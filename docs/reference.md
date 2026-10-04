@@ -113,6 +113,7 @@ Show live configuration and runtime status.
 |---|---|
 | `ecsctl describe cluster NAME` | — |
 | `ecsctl describe service NAME` | `--cluster CLUSTER` |
+| `ecsctl describe task TASK` | `--cluster CLUSTER` |
 
 ### `list`
 

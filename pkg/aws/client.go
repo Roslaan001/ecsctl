@@ -1217,6 +1217,92 @@ func (c *Client) PrintServiceDetail(ctx context.Context, clusterName, serviceNam
 	return nil
 }
 
+// PrintTaskDetail prints runtime and failure details for an ECS task.
+func (c *Client) PrintTaskDetail(ctx context.Context, clusterName, taskID string) error {
+	out, err := c.ecs.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+		Cluster: aws.String(clusterName),
+		Tasks:   []string{taskID},
+		Include: []types.TaskField{types.TaskFieldTags},
+	})
+	if err != nil {
+		return fmt.Errorf("describing task: %w", err)
+	}
+	if len(out.Tasks) == 0 {
+		if len(out.Failures) > 0 {
+			failure := out.Failures[0]
+			return fmt.Errorf("task %q not found: %s", taskID, aws.ToString(failure.Reason))
+		}
+		return fmt.Errorf("task %q not found in cluster %q", taskID, clusterName)
+	}
+
+	task := out.Tasks[0]
+	group := aws.ToString(task.Group)
+	group = strings.TrimPrefix(group, "service:")
+	fmt.Printf("Task:             %s\n", aws.ToString(task.TaskArn))
+	fmt.Printf("Cluster:          %s\n", aws.ToString(task.ClusterArn))
+	fmt.Printf("Service / group:  %s\n", displayOrDash(group))
+	fmt.Printf("Task definition:  %s\n", aws.ToString(task.TaskDefinitionArn))
+	fmt.Printf("Last status:      %s\n", aws.ToString(task.LastStatus))
+	fmt.Printf("Desired status:   %s\n", aws.ToString(task.DesiredStatus))
+	fmt.Printf("Health:           %s\n", displayOrDash(string(task.HealthStatus)))
+	fmt.Printf("Launch type:      %s\n", displayOrDash(string(task.LaunchType)))
+	fmt.Printf("Capacity provider:%s\n", displayOrDash(aws.ToString(task.CapacityProviderName)))
+	fmt.Printf("Availability zone:%s\n", displayOrDash(aws.ToString(task.AvailabilityZone)))
+	fmt.Printf("Created at:       %s\n", formatTaskTime(task.CreatedAt))
+	fmt.Printf("Started at:       %s\n", formatTaskTime(task.StartedAt))
+	fmt.Printf("Stopped at:       %s\n", formatTaskTime(task.StoppedAt))
+	fmt.Printf("Stop code:        %s\n", displayOrDash(string(task.StopCode)))
+	fmt.Printf("Stopped reason:   %s\n", displayOrDash(aws.ToString(task.StoppedReason)))
+	fmt.Printf("Task CPU/memory:  %s / %s\n", displayOrDash(aws.ToString(task.Cpu)), displayOrDash(aws.ToString(task.Memory)))
+
+	if len(task.Containers) > 0 {
+		fmt.Println("\nContainers:")
+		for _, container := range task.Containers {
+			exitCode := "-"
+			if container.ExitCode != nil {
+				exitCode = fmt.Sprint(*container.ExitCode)
+			}
+			fmt.Printf("  %s  status=%s health=%s exit=%s\n", displayOrDash(aws.ToString(container.Name)), displayOrDash(aws.ToString(container.LastStatus)), displayOrDash(string(container.HealthStatus)), exitCode)
+			fmt.Printf("    image:  %s\n", displayOrDash(aws.ToString(container.Image)))
+			if reason := aws.ToString(container.Reason); reason != "" {
+				fmt.Printf("    reason: %s\n", reason)
+			}
+		}
+	}
+
+	if len(task.Attachments) > 0 {
+		fmt.Println("\nAttachments:")
+		for _, attachment := range task.Attachments {
+			fmt.Printf("  %s  status=%s id=%s\n", displayOrDash(aws.ToString(attachment.Type)), displayOrDash(aws.ToString(attachment.Status)), displayOrDash(aws.ToString(attachment.Id)))
+			for _, detail := range attachment.Details {
+				fmt.Printf("    %s: %s\n", aws.ToString(detail.Name), aws.ToString(detail.Value))
+			}
+		}
+	}
+
+	if len(task.Tags) > 0 {
+		fmt.Println("\nTags:")
+		for _, tag := range task.Tags {
+			fmt.Printf("  %s = %s\n", aws.ToString(tag.Key), aws.ToString(tag.Value))
+		}
+	}
+	return nil
+}
+
+func displayOrDash(value string) string {
+	if value == "" {
+		return "-"
+	}
+	return value
+}
+
+func formatTaskTime(value *time.Time) string {
+	if value == nil {
+		return "-"
+	}
+	return value.UTC().Format("2006-01-02 15:04:05 UTC")
+}
+
 // ClusterExists returns true if an ACTIVE cluster with the given name exists.
 func (c *Client) ClusterExists(ctx context.Context, clusterName string) (bool, error) {
 	out, err := c.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{
