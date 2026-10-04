@@ -21,6 +21,31 @@ type ListOptions struct {
 	LaunchType    string
 	DesiredStatus string
 	Family        string
+	Metadata      map[string]ResourceMetadata
+}
+
+// ResourceMetadata contains the ecsctl tracking details available for a live resource.
+type ResourceMetadata struct {
+	CreatedBy string
+	CreatedAt time.Time
+}
+
+// ClusterListColumns returns the stable column layout used for live and state inventories.
+func ClusterListColumns(wide bool) []ListColumn {
+	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"services", "SERVICES"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"capacityProviders", "CAPACITY PROVIDERS"}, {"region", "REGION"}, {"createdBy", "TRACKED BY"}, {"trackedAt", "TRACKED AT"}}
+	if wide {
+		columns = append(columns, ListColumn{"arn", "ARN"})
+	}
+	return columns
+}
+
+// ServiceListColumns returns the stable column layout used for live and state inventories.
+func ServiceListColumns(wide bool) []ListColumn {
+	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"health", "HEALTH"}, {"deployment", "DEPLOYMENT"}, {"desired", "DESIRED"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"launchType", "LAUNCH TYPE"}, {"taskDefinition", "TASK DEFINITION"}, {"createdAt", "CREATED AT"}, {"cluster", "CLUSTER"}, {"region", "REGION"}, {"createdBy", "TRACKED BY"}, {"trackedAt", "TRACKED AT"}}
+	if wide {
+		columns = append(columns, ListColumn{"arn", "SERVICE ARN"}, ListColumn{"taskDefinitionArn", "TASK DEFINITION ARN"})
+	}
+	return columns
 }
 
 // ListColumn describes a field displayed by a list command.

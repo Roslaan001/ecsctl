@@ -116,16 +116,16 @@ Show live configuration and runtime status.
 
 ### `list`
 
-List resources from saved state or query live AWS resources with `--live`.
+Cluster and service lists query live AWS by default and add tracking metadata from remote state when available. Use `--state` to list only saved resources; the legacy `--live` flag is still accepted.
 
 | Syntax | Flags |
 |---|---|
-| `ecsctl list clusters` | `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
-| `ecsctl list services` | `--cluster CLUSTER`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list clusters` | `--state`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list services` | `--cluster CLUSTER`, `--state`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
 | `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--name PREFIX`, `--status STATUS`, `--desired-status STATUS`, `--launch-type TYPE`, `--wide` |
 | `ecsctl list task-definitions` | `--status STATUS`, `--family PREFIX`, `--wide` |
 
-All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and creation time. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. State-backed cluster/service lists show saved inventory; runtime status filters use live AWS data. State-backed cluster lists include the recorded creation time when ecsctl created the cluster. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
+All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and AWS creation time. Cluster/service results include tracking metadata when available. State-only mode uses the same output fields, with null live fields. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. `--status` filters use live AWS and cannot be combined with `--state`. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
 
 ### `deploy`
 

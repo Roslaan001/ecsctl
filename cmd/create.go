@@ -381,9 +381,10 @@ func recordClusterState(s *stateSession, client *aws.Client, cfg *config.Cluster
 	if err != nil {
 		return fmt.Errorf("reading cluster identity for remote state: %w", err)
 	}
+	createdBy, trackedAt := trackedResourceMetadata(s, state.ResourceTypeCluster, cfg.Name, "", arn, region, createdAt)
 	resource := state.Resource{
 		Type: state.ResourceTypeCluster, Name: cfg.Name, ARN: arn,
-		Region: region, CreatedBy: currentUsername(), CreatedAt: createdAt.UTC(), Configuration: string(serialized),
+		Region: region, CreatedBy: createdBy, CreatedAt: trackedAt, Configuration: string(serialized),
 	}
 	return s.Update(func(st *state.State) {
 		st.AddResource(resource)
@@ -402,9 +403,10 @@ func recordServiceState(s *stateSession, client *aws.Client, cfg *config.Service
 	if err != nil {
 		return fmt.Errorf("reading service identity for remote state: %w", err)
 	}
+	createdBy, trackedAt := trackedResourceMetadata(s, state.ResourceTypeService, cfg.Name, cfg.Cluster, arn, region, time.Time{})
 	resource := state.Resource{
 		Type: state.ResourceTypeService, Name: cfg.Name, ARN: arn, Cluster: cfg.Cluster,
-		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+		Region: region, CreatedBy: createdBy, CreatedAt: trackedAt, Configuration: string(serialized),
 	}
 	return s.Update(func(st *state.State) {
 		st.AddResource(resource)
@@ -419,13 +421,35 @@ func recordExpressState(s *stateSession, client *aws.Client, cfg *config.Express
 	if err != nil {
 		return fmt.Errorf("serializing Express config for remote state: %w", err)
 	}
+	createdBy, trackedAt := trackedResourceMetadata(s, state.ResourceTypeExpressService, cfg.ServiceName, cfg.Cluster, arn, region, time.Time{})
 	resource := &state.Resource{
 		Type: state.ResourceTypeExpressService, Name: cfg.ServiceName, ARN: arn, Cluster: cfg.Cluster,
-		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+		Region: region, CreatedBy: createdBy, CreatedAt: trackedAt, Configuration: string(serialized),
 	}
 	return s.Update(func(st *state.State) {
 		st.AddResource(*resource)
 	})
+}
+
+func trackedResourceMetadata(s *stateSession, resourceType state.ResourceType, name, cluster, arn, region string, createdAt time.Time) (string, time.Time) {
+	if s != nil && s.current != nil {
+		for _, existing := range s.current.Resources {
+			if existing.Type != resourceType || existing.Name != name || existing.Cluster != cluster {
+				continue
+			}
+			if existing.ARN != "" && arn != "" && existing.ARN != arn {
+				continue
+			}
+			if (existing.ARN == "" || arn == "") && existing.Region != region {
+				continue
+			}
+			return existing.CreatedBy, existing.CreatedAt
+		}
+	}
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	return currentUsername(), createdAt.UTC()
 }
 
 func updateTrackedServiceConfig(session *stateSession, client *aws.Client, cluster, service string, update func(*config.ServiceConfig)) error {
