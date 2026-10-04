@@ -15,3 +15,11 @@ if [[ "$message" =~ $closing_issue_pattern ]]; then
 	printf 'Move issue-closing references to the pull request description.\n' >&2
 	exit 1
 fi
+
+# Avoid notifying users when GitHub displays commit messages in a pull request.
+mention_pattern='(^|[^[:alnum:]_.+-])@[[:alnum:]][[:alnum:]_-]*(/[[:alnum:]_-]+)?'
+if [[ "$message" =~ $mention_pattern ]]; then
+	printf 'Commit messages must not include GitHub @mentions.\n' >&2
+	printf 'Refer to users by name instead.\n' >&2
+	exit 1
+fi
