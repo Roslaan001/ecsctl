@@ -2,14 +2,14 @@
 
 Release Please creates a reviewed release pull request from the Conventional Commits merged to the default branch. After that pull request is merged, ecsctl publishes a GitHub release with its version and release notes.
 
-The workflow keeps an open release pull request updated as the default branch advances. Commit types hidden by the changelog configuration, such as `chore`, can update the release branch without appearing in its notes.
+The workflow keeps an open release pull request updated as the default branch advances, including maintenance changes merged while it is open.
 
 ## Release history
 
 - [Browse published releases](https://github.com/Roslaan001/ecsctl/releases) for version-specific notes and downloadable binaries.
 - Read the complete [CHANGELOG.md](https://github.com/Roslaan001/ecsctl/blob/main/CHANGELOG.md) for the project history.
 
-The release notes group user-facing changes into features, bug fixes, performance, documentation, and reverts. Scopes such as `security` remain visible alongside the change summary. Build, CI, test, style, refactor, and chore commits are kept out of the published changelog.
+The release notes group changes into features, bug fixes, performance, documentation, maintenance, and reverts. Scopes such as `security` remain visible alongside the change summary. Chore commits appear under Maintenance; build, CI, test, style, and refactor commits remain hidden.
 
 ## Upgrade guidance
 

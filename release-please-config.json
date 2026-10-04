@@ -9,7 +9,7 @@
     { "type": "docs", "section": "Documentation" },
     { "type": "revert", "section": "Reverts" },
     { "type": "build", "section": "Build", "hidden": true },
-    { "type": "chore", "section": "Maintenance", "hidden": true },
+    { "type": "chore", "section": "Maintenance" },
     { "type": "ci", "section": "CI", "hidden": true },
     { "type": "refactor", "section": "Refactoring", "hidden": true },
     { "type": "style", "section": "Style", "hidden": true },
