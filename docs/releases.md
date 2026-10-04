@@ -2,6 +2,8 @@
 
 Release Please creates a reviewed release pull request from the Conventional Commits merged to the default branch. After that pull request is merged, ecsctl publishes a GitHub release with its version and release notes.
 
+The workflow keeps an open release pull request updated as the default branch advances. Commit types hidden by the changelog configuration, such as `chore`, can update the release branch without appearing in its notes.
+
 ## Release history
 
 - [Browse published releases](https://github.com/Roslaan001/ecsctl/releases) for version-specific notes and downloadable binaries.
