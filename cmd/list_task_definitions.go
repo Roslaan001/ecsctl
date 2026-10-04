@@ -11,6 +11,7 @@ import (
 )
 
 var taskDefinitionStatus string
+var taskDefinitionFamily string
 
 var listTaskDefinitionsCmd = &cobra.Command{
 	Use:     "task-definitions",
@@ -29,10 +30,17 @@ var listTaskDefinitionsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
-		return client.ListTaskDefinitions(context.Background(), status, listWide)
+		options := currentListOptions()
+		options.Family = taskDefinitionFamily
+		options.Status = string(status)
+		if err := validateListOptions(options); err != nil {
+			return err
+		}
+		return client.ListTaskDefinitions(context.Background(), status, options, listWide)
 	},
 }
 
 func init() {
 	listTaskDefinitionsCmd.Flags().StringVar(&taskDefinitionStatus, "status", "ACTIVE", "Task definition status: ACTIVE, INACTIVE, or DELETE_IN_PROGRESS")
+	listTaskDefinitionsCmd.Flags().StringVar(&taskDefinitionFamily, "family", "", "Filter by task definition family prefix")
 }

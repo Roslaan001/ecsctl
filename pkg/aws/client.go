@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1010,110 +1011,97 @@ func (c *Client) ExecInTask(ctx context.Context, opts ExecOptions) error {
 	return nil
 }
 
-// ListClusters lists all ECS clusters in the account/region and prints them.
-func (c *Client) ListClusters(ctx context.Context, wide bool) error {
+// ListClusters lists ECS clusters and prints the selected table or JSON output.
+func (c *Client) ListClusters(ctx context.Context, options ListOptions, wide bool) error {
 	var nextToken *string
+	rows := make([]map[string]any, 0)
+	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"services", "SERVICES"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"capacityProviders", "CAPACITY PROVIDERS"}}
 	if wide {
-		fmt.Printf("%-30s %-12s %-10s %-10s %-10s %-34s %s\n", "NAME", "STATUS", "SERVICES", "RUNNING", "PENDING", "CAPACITY PROVIDERS", "ARN")
-	} else {
-		fmt.Printf("%-30s %-12s %-10s %-10s %-10s %s\n", "NAME", "STATUS", "SERVICES", "RUNNING", "PENDING", "CAPACITY PROVIDERS")
+		columns = append(columns, ListColumn{"arn", "ARN"})
 	}
-	fmt.Println("--------------------------------------------------------------------------------")
-
 	for {
-		listOut, err := c.ecs.ListClusters(ctx, &ecs.ListClustersInput{
-			NextToken: nextToken,
-		})
+		listOut, err := c.ecs.ListClusters(ctx, &ecs.ListClustersInput{NextToken: nextToken})
 		if err != nil {
 			return fmt.Errorf("listing clusters: %w", err)
 		}
-		if len(listOut.ClusterArns) == 0 {
-			fmt.Println("No clusters found.")
-			return nil
-		}
-
-		descOut, err := c.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{
-			Clusters: listOut.ClusterArns,
-		})
-		if err != nil {
-			return fmt.Errorf("describing clusters: %w", err)
-		}
-
-		for _, cl := range descOut.Clusters {
-			providers := strings.Join(cl.CapacityProviders, ",")
-			if providers == "" {
-				providers = "-"
+		if len(listOut.ClusterArns) > 0 {
+			descOut, err := c.ecs.DescribeClusters(ctx, &ecs.DescribeClustersInput{Clusters: listOut.ClusterArns})
+			if err != nil {
+				return fmt.Errorf("describing clusters: %w", err)
 			}
-			if wide {
-				fmt.Printf("%-30s %-12s %-10d %-10d %-10d %-34s %s\n",
-					aws.ToString(cl.ClusterName), aws.ToString(cl.Status), cl.ActiveServicesCount,
-					cl.RunningTasksCount, cl.PendingTasksCount, providers, aws.ToString(cl.ClusterArn))
-			} else {
-				fmt.Printf("%-30s %-12s %-10d %-10d %-10d %s\n",
-					aws.ToString(cl.ClusterName), aws.ToString(cl.Status), cl.ActiveServicesCount,
-					cl.RunningTasksCount, cl.PendingTasksCount, providers)
+			for _, cl := range descOut.Clusters {
+				rows = append(rows, map[string]any{"name": aws.ToString(cl.ClusterName), "status": aws.ToString(cl.Status), "services": cl.ActiveServicesCount, "running": cl.RunningTasksCount, "pending": cl.PendingTasksCount, "capacityProviders": strings.Join(cl.CapacityProviders, ","), "arn": aws.ToString(cl.ClusterArn)})
 			}
 		}
-
 		if listOut.NextToken == nil {
 			break
 		}
 		nextToken = listOut.NextToken
 	}
-	return nil
+	return RenderList(rows, columns, options)
 }
 
-// ListServices lists all services in a given ECS cluster and prints them.
-func (c *Client) ListServices(ctx context.Context, clusterName string, wide bool) error {
+// ListServices lists services in a cluster, including deployment health and resource counts.
+func (c *Client) ListServices(ctx context.Context, clusterName string, options ListOptions, wide bool) error {
 	var nextToken *string
+	rows := make([]map[string]any, 0)
+	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"health", "HEALTH"}, {"deployment", "DEPLOYMENT"}, {"desired", "DESIRED"}, {"running", "RUNNING"}, {"pending", "PENDING"}, {"launchType", "LAUNCH TYPE"}, {"taskDefinition", "TASK DEFINITION"}, {"createdAt", "CREATED AT"}}
 	if wide {
-		fmt.Printf("%-30s %-12s %-8s %-8s %-8s %-30s %-55s %s\n", "NAME", "STATUS", "DESIRED", "RUNNING", "PENDING", "TASK DEFINITION", "SERVICE ARN", "TASK DEFINITION ARN")
-	} else {
-		fmt.Printf("%-30s %-12s %-8s %-8s %-8s %s\n", "NAME", "STATUS", "DESIRED", "RUNNING", "PENDING", "TASK DEFINITION")
+		columns = append(columns, ListColumn{"arn", "SERVICE ARN"}, ListColumn{"taskDefinitionArn", "TASK DEFINITION ARN"})
 	}
-	fmt.Println("--------------------------------------------------------------------------------")
-
 	for {
-		listOut, err := c.ecs.ListServices(ctx, &ecs.ListServicesInput{
-			Cluster:   aws.String(clusterName),
-			NextToken: nextToken,
-		})
+		listOut, err := c.ecs.ListServices(ctx, &ecs.ListServicesInput{Cluster: aws.String(clusterName), NextToken: nextToken})
 		if err != nil {
 			return fmt.Errorf("listing services: %w", err)
 		}
-		if len(listOut.ServiceArns) == 0 {
-			fmt.Println("No services found.")
-			return nil
-		}
-
-		descOut, err := c.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{
-			Cluster:  aws.String(clusterName),
-			Services: listOut.ServiceArns,
-		})
-		if err != nil {
-			return fmt.Errorf("describing services: %w", err)
-		}
-
-		for _, svc := range descOut.Services {
-			taskDefinition := shortTaskDefinitionARN(aws.ToString(svc.TaskDefinition))
-			if wide {
-				fmt.Printf("%-30s %-12s %-8d %-8d %-8d %-30s %-55s %s\n",
-					aws.ToString(svc.ServiceName), aws.ToString(svc.Status), svc.DesiredCount,
-					svc.RunningCount, svc.PendingCount, taskDefinition,
-					aws.ToString(svc.ServiceArn), aws.ToString(svc.TaskDefinition))
-			} else {
-				fmt.Printf("%-30s %-12s %-8d %-8d %-8d %s\n",
-					aws.ToString(svc.ServiceName), aws.ToString(svc.Status), svc.DesiredCount,
-					svc.RunningCount, svc.PendingCount, taskDefinition)
+		if len(listOut.ServiceArns) > 0 {
+			for start := 0; start < len(listOut.ServiceArns); start += 10 {
+				end := start + 10
+				if end > len(listOut.ServiceArns) {
+					end = len(listOut.ServiceArns)
+				}
+				descOut, err := c.ecs.DescribeServices(ctx, &ecs.DescribeServicesInput{Cluster: aws.String(clusterName), Services: listOut.ServiceArns[start:end]})
+				if err != nil {
+					return fmt.Errorf("describing services: %w", err)
+				}
+				for _, svc := range descOut.Services {
+					deployment := "-"
+					for _, candidate := range svc.Deployments {
+						if aws.ToString(candidate.Status) == "PRIMARY" || deployment == "-" {
+							if candidate.RolloutState != "" {
+								deployment = string(candidate.RolloutState)
+							}
+							if aws.ToString(candidate.Status) == "PRIMARY" {
+								break
+							}
+						}
+					}
+					health := "HEALTHY"
+					if deployment == string(types.DeploymentRolloutStateInProgress) {
+						health = "DEPLOYING"
+					} else if deployment == string(types.DeploymentRolloutStateFailed) {
+						health = "DEGRADED"
+					} else if svc.RunningCount < svc.DesiredCount {
+						health = "DEGRADED"
+					}
+					if svc.DesiredCount == 0 {
+						health = "IDLE"
+					}
+					var createdAt any
+					if svc.CreatedAt != nil {
+						createdAt = *svc.CreatedAt
+					}
+					tdARN := aws.ToString(svc.TaskDefinition)
+					rows = append(rows, map[string]any{"name": aws.ToString(svc.ServiceName), "status": aws.ToString(svc.Status), "health": health, "deployment": deployment, "desired": svc.DesiredCount, "running": svc.RunningCount, "pending": svc.PendingCount, "launchType": string(svc.LaunchType), "taskDefinition": shortTaskDefinitionARN(tdARN), "createdAt": createdAt, "arn": aws.ToString(svc.ServiceArn), "taskDefinitionArn": tdARN})
+				}
 			}
 		}
-
 		if listOut.NextToken == nil {
 			break
 		}
 		nextToken = listOut.NextToken
 	}
-	return nil
+	return RenderList(rows, columns, options)
 }
 
 // PrintClusterDetail prints a detailed description of an ECS cluster.
@@ -1504,102 +1492,98 @@ func (c *Client) reconcileTags(ctx context.Context, arn string, current []types.
 }
 
 // PrintTasks lists running tasks in a cluster, optionally filtered by service.
-func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string, wide bool) error {
-	input := &ecs.ListTasksInput{
-		Cluster: aws.String(clusterName),
-	}
-	if serviceName != "" {
-		input.ServiceName = aws.String(serviceName)
-	}
-
-	listOut, err := c.ecs.ListTasks(ctx, input)
-	if err != nil {
-		return fmt.Errorf("listing tasks: %w", err)
-	}
-	if len(listOut.TaskArns) == 0 {
-		fmt.Println("No running tasks found.")
-		return nil
-	}
-
-	descOut, err := c.ecs.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: aws.String(clusterName),
-		Tasks:   listOut.TaskArns,
-	})
-	if err != nil {
-		return fmt.Errorf("describing tasks: %w", err)
-	}
-
+func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string, options ListOptions, wide bool) error {
+	rows := make([]map[string]any, 0)
+	columns := []ListColumn{{"name", "TASK ID"}, {"status", "STATUS"}, {"desiredStatus", "DESIRED"}, {"health", "HEALTH"}, {"service", "SERVICE"}, {"launchType", "LAUNCH TYPE"}, {"cpu", "CPU"}, {"memory", "MEMORY"}, {"startedAt", "STARTED AT"}, {"taskDefinition", "TASK DEFINITION"}}
 	if wide {
-		fmt.Printf("%-20s %-12s %-24s %-12s %-20s %-30s %-55s %s\n", "TASK ID", "STATUS", "SERVICE", "LAUNCH TYPE", "STARTED AT", "TASK DEFINITION", "TASK ARN", "TASK DEFINITION ARN")
-	} else {
-		fmt.Printf("%-20s %-12s %-24s %-12s %-20s %s\n", "TASK ID", "STATUS", "SERVICE", "LAUNCH TYPE", "STARTED AT", "TASK DEFINITION")
+		columns = append(columns, ListColumn{"arn", "TASK ARN"}, ListColumn{"taskDefinitionArn", "TASK DEFINITION ARN"})
 	}
-	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────────")
-
-	for _, task := range descOut.Tasks {
-		// Extract short task ID from the last segment of the ARN
-		taskID := aws.ToString(task.TaskArn)
-		if parts := strings.Split(taskID, "/"); len(parts) > 1 {
-			taskID = parts[len(parts)-1]
+	var nextToken *string
+	for {
+		input := &ecs.ListTasksInput{Cluster: aws.String(clusterName), NextToken: nextToken}
+		if serviceName != "" {
+			input.ServiceName = aws.String(serviceName)
 		}
-
-		startedAt := ""
-		if task.StartedAt != nil {
-			startedAt = task.StartedAt.Format("2006-01-02 15:04:05")
+		if options.DesiredStatus != "" {
+			input.DesiredStatus = types.DesiredStatus(strings.ToUpper(options.DesiredStatus))
 		}
-
-		service := "-"
-		if group := aws.ToString(task.Group); strings.HasPrefix(group, "service:") {
-			service = strings.TrimPrefix(group, "service:")
+		listOut, err := c.ecs.ListTasks(ctx, input)
+		if err != nil {
+			return fmt.Errorf("listing tasks: %w", err)
 		}
-		tdARN := aws.ToString(task.TaskDefinitionArn)
-		displayTD := shortTaskDefinitionARN(tdARN)
-
-		if wide {
-			fmt.Printf("%-20s %-12s %-24s %-12s %-20s %-30s %-55s %s\n",
-				taskID, aws.ToString(task.LastStatus), service, string(task.LaunchType),
-				startedAt, displayTD, aws.ToString(task.TaskArn), tdARN)
-		} else {
-			fmt.Printf("%-20s %-12s %-24s %-12s %-20s %s\n",
-				taskID, aws.ToString(task.LastStatus), service, string(task.LaunchType),
-				startedAt, displayTD)
+		if len(listOut.TaskArns) > 0 {
+			descOut, err := c.ecs.DescribeTasks(ctx, &ecs.DescribeTasksInput{Cluster: aws.String(clusterName), Tasks: listOut.TaskArns})
+			if err != nil {
+				return fmt.Errorf("describing tasks: %w", err)
+			}
+			for _, task := range descOut.Tasks {
+				taskARN := aws.ToString(task.TaskArn)
+				taskID := taskARN
+				if parts := strings.Split(taskID, "/"); len(parts) > 1 {
+					taskID = parts[len(parts)-1]
+				}
+				service := "-"
+				if group := aws.ToString(task.Group); strings.HasPrefix(group, "service:") {
+					service = strings.TrimPrefix(group, "service:")
+				}
+				tdARN := aws.ToString(task.TaskDefinitionArn)
+				var startedAt, createdAt any
+				if task.StartedAt != nil {
+					startedAt = *task.StartedAt
+				}
+				if task.CreatedAt != nil {
+					createdAt = *task.CreatedAt
+				}
+				rows = append(rows, map[string]any{"name": taskID, "status": aws.ToString(task.LastStatus), "desiredStatus": aws.ToString(task.DesiredStatus), "health": string(task.HealthStatus), "service": service, "launchType": string(task.LaunchType), "cpu": aws.ToString(task.Cpu), "memory": aws.ToString(task.Memory), "createdAt": createdAt, "startedAt": startedAt, "taskDefinition": shortTaskDefinitionARN(tdARN), "arn": taskARN, "taskDefinitionArn": tdARN})
+			}
 		}
+		if listOut.NextToken == nil {
+			break
+		}
+		nextToken = listOut.NextToken
 	}
-	return nil
+	return RenderList(rows, columns, options)
 }
 
 // ListTaskDefinitions lists task definition revisions with the requested status.
-func (c *Client) ListTaskDefinitions(ctx context.Context, status types.TaskDefinitionStatus, wide bool) error {
+func (c *Client) ListTaskDefinitions(ctx context.Context, status types.TaskDefinitionStatus, options ListOptions, wide bool) error {
 	if status == "" {
 		status = types.TaskDefinitionStatusActive
 	}
 
-	if wide {
-		fmt.Printf("%-40s %-10s %-18s %s\n", "FAMILY", "REVISION", "STATUS", "ARN")
-	} else {
-		fmt.Printf("%-40s %-10s %s\n", "FAMILY", "REVISION", "STATUS")
-	}
-	fmt.Println("--------------------------------------------------------------------------------")
-
 	var nextToken *string
-	found := false
+	rows := make([]map[string]any, 0)
+	columns := []ListColumn{{"family", "FAMILY"}, {"revision", "REVISION"}, {"status", "STATUS"}, {"cpu", "CPU"}, {"memory", "MEMORY"}, {"registeredAt", "REGISTERED AT"}}
+	if wide {
+		columns = append(columns, ListColumn{"arn", "ARN"})
+	}
 	for {
-		out, err := c.ecs.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
-			Status:    status,
-			NextToken: nextToken,
-		})
+		input := &ecs.ListTaskDefinitionsInput{Status: status, NextToken: nextToken}
+		if options.Family != "" {
+			input.FamilyPrefix = aws.String(options.Family)
+		}
+		out, err := c.ecs.ListTaskDefinitions(ctx, input)
 		if err != nil {
 			return fmt.Errorf("listing task definitions: %w", err)
 		}
 
 		for _, arn := range out.TaskDefinitionArns {
 			family, revision := taskDefinitionFamilyAndRevision(arn)
-			if wide {
-				fmt.Printf("%-40s %-10s %-18s %s\n", family, revision, status, arn)
-			} else {
-				fmt.Printf("%-40s %-10s %s\n", family, revision, status)
+			revisionNumber, _ := strconv.Atoi(revision)
+			desc, err := c.ecs.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: aws.String(arn)})
+			if err != nil {
+				return fmt.Errorf("describing task definition %q: %w", arn, err)
 			}
-			found = true
+			definition := desc.TaskDefinition
+			var registeredAt any
+			cpu, memory := "", ""
+			if definition != nil {
+				if definition.RegisteredAt != nil {
+					registeredAt = *definition.RegisteredAt
+				}
+				cpu, memory = aws.ToString(definition.Cpu), aws.ToString(definition.Memory)
+			}
+			rows = append(rows, map[string]any{"name": family, "family": family, "revision": revisionNumber, "status": string(status), "cpu": cpu, "memory": memory, "registeredAt": registeredAt, "arn": arn})
 		}
 
 		if out.NextToken == nil {
@@ -1607,10 +1591,7 @@ func (c *Client) ListTaskDefinitions(ctx context.Context, status types.TaskDefin
 		}
 		nextToken = out.NextToken
 	}
-	if !found {
-		fmt.Printf("No %s task definitions found.\n", strings.ToLower(string(status)))
-	}
-	return nil
+	return RenderList(rows, columns, options)
 }
 
 func shortTaskDefinitionARN(arn string) string {

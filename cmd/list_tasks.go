@@ -25,7 +25,11 @@ var listTasksCmd = &cobra.Command{
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
 
-		if err := client.PrintTasks(context.Background(), listTasksCluster, listTasksService, listWide); err != nil {
+		options := currentListOptions()
+		if err := validateListOptions(options); err != nil {
+			return err
+		}
+		if err := client.PrintTasks(context.Background(), listTasksCluster, listTasksService, options, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}
@@ -36,6 +40,10 @@ var listTasksCmd = &cobra.Command{
 func init() {
 	listTasksCmd.Flags().StringVar(&listTasksCluster, "cluster", "", "ECS cluster name (required)")
 	listTasksCmd.Flags().StringVar(&listTasksService, "service", "", "Filter tasks by service name (optional)")
+	listTasksCmd.Flags().StringVar(&listName, "name", "", "Filter by task ID prefix")
+	listTasksCmd.Flags().StringVar(&listStatusFilter, "status", "", "Filter by last known task status")
+	listTasksCmd.Flags().StringVar(&listDesiredStatus, "desired-status", "", "Filter by desired task status (RUNNING, PENDING, or STOPPED)")
+	listTasksCmd.Flags().StringVar(&listLaunchType, "launch-type", "", "Filter by launch type (EC2, FARGATE, or EXTERNAL)")
 	_ = listTasksCmd.MarkFlagRequired("cluster")
 
 	listCmd.AddCommand(listTasksCmd)
