@@ -36,9 +36,9 @@ var listClustersCmd = &cobra.Command{
 			resources, ok := listClustersFromState(ctx)
 			if ok {
 				if listWide {
-					fmt.Printf("%-40s %-10s %-20s %s\n", "NAME", "REGION", "CREATED BY", "ARN")
+					fmt.Printf("%-40s %-10s %-20s %-24s %s\n", "NAME", "REGION", "CREATED BY", "CREATED AT", "ARN")
 				} else {
-					fmt.Printf("%-40s %-10s %s\n", "NAME", "REGION", "CREATED BY")
+					fmt.Printf("%-40s %-10s %-20s %s\n", "NAME", "REGION", "CREATED BY", "CREATED AT")
 				}
 				fmt.Println("--------------------------------------------------------------------------------")
 				if len(resources) == 0 {
@@ -46,10 +46,14 @@ var listClustersCmd = &cobra.Command{
 					return nil
 				}
 				for _, r := range resources {
+					createdAt := "-"
+					if !r.CreatedAt.IsZero() {
+						createdAt = r.CreatedAt.UTC().Format("2006-01-02 15:04:05 UTC")
+					}
 					if listWide {
-						fmt.Printf("%-40s %-10s %-20s %s\n", r.Name, r.Region, r.CreatedBy, r.ARN)
+						fmt.Printf("%-40s %-10s %-20s %-24s %s\n", r.Name, r.Region, r.CreatedBy, createdAt, r.ARN)
 					} else {
-						fmt.Printf("%-40s %-10s %s\n", r.Name, r.Region, r.CreatedBy)
+						fmt.Printf("%-40s %-10s %-20s %s\n", r.Name, r.Region, r.CreatedBy, createdAt)
 					}
 				}
 				fmt.Println("\n(source: remote state)")

@@ -125,7 +125,7 @@ List resources from saved state or query live AWS resources with `--live`.
 | `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--wide` |
 | `ecsctl list task-definitions` | `--status STATUS`, `--wide` |
 
-List output shows runtime counts for clusters and services, and task status, service, launch type, and start time for tasks. Use `--wide` to include full ARNs. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
+List output shows runtime counts for clusters and services, and task status, service, launch type, and start time for tasks. State-backed cluster lists include the recorded creation time when ecsctl created the cluster. Use `--wide` to include full ARNs. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
 
 ### `deploy`
 

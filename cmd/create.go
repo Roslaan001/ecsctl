@@ -105,6 +105,7 @@ capacity provider. Override the instance type or count with the corresponding fl
 		} else {
 			fmt.Printf("Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
 		}
+		createStartedAt := time.Now().UTC()
 		var createErr error
 		if createClusterEC2 {
 			createErr = client.CreateEC2Cluster(context.Background(), cfg, createClusterEC2InstanceType, createClusterEC2Count)
@@ -120,7 +121,7 @@ capacity provider. Override the instance type or count with the corresponding fl
 
 		// Write to remote state if a context is configured
 		if session != nil {
-			if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+			if err := recordClusterState(session, client, cfg, resolvedRegion, createStartedAt); err != nil {
 				return fmt.Errorf("cluster created but remote state was not updated: %w", err)
 			}
 		}
@@ -364,7 +365,7 @@ func closeStateSessionOnReturn(session *stateSession, runErr *error, operation s
 	}
 }
 
-func recordClusterState(s *stateSession, client *aws.Client, cfg *config.ClusterConfig, region string) error {
+func recordClusterState(s *stateSession, client *aws.Client, cfg *config.ClusterConfig, region string, createdAt time.Time) error {
 	if region == "" {
 		region = client.Region()
 	}
@@ -382,7 +383,7 @@ func recordClusterState(s *stateSession, client *aws.Client, cfg *config.Cluster
 	}
 	resource := state.Resource{
 		Type: state.ResourceTypeCluster, Name: cfg.Name, ARN: arn,
-		Region: region, CreatedBy: currentUsername(), CreatedAt: time.Now().UTC(), Configuration: string(serialized),
+		Region: region, CreatedBy: currentUsername(), CreatedAt: createdAt.UTC(), Configuration: string(serialized),
 	}
 	return s.Update(func(st *state.State) {
 		st.AddResource(resource)

@@ -15,7 +15,7 @@ ecsctl list tasks --cluster production --wide --region eu-west-2
 ecsctl list task-definitions --status ACTIVE --wide --region eu-west-2
 ```
 
-Cluster lists show active services, running and pending tasks, and capacity providers. Service lists show desired, running, and pending tasks plus the task definition. Task lists include service, launch type, start time, and task definition. Add `--wide` to include full ARNs.
+Live cluster lists show active services, running and pending tasks, and capacity providers. State-backed cluster lists also show the recorded creation time for clusters created through ecsctl. Service lists show desired, running, and pending tasks plus the task definition. Task lists include service, launch type, start time, and task definition. Add `--wide` to include full ARNs.
 
 ### 1. List Clusters
 List all ECS clusters:
