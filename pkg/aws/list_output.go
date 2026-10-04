@@ -3,6 +3,7 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -83,31 +84,28 @@ func RenderList(rows []map[string]any, columns []ListColumn, options ListOptions
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	if len(filtered) == 0 {
-		fmt.Fprintln(writer, "No results found.")
+		if _, err := io.WriteString(writer, "No results found.\n"); err != nil {
+			return err
+		}
 		return writer.Flush()
 	}
-	for i, column := range columns {
-		if i > 0 {
-			fmt.Fprint(writer, "\t")
-		}
-		fmt.Fprint(writer, column.Title)
+	lines := make([]string, 0, len(filtered)+2)
+	titles := make([]string, 0, len(columns))
+	underlines := make([]string, 0, len(columns))
+	for _, column := range columns {
+		titles = append(titles, column.Title)
+		underlines = append(underlines, strings.Repeat("-", len(column.Title)))
 	}
-	fmt.Fprintln(writer)
-	for i := 0; i < len(columns); i++ {
-		if i > 0 {
-			fmt.Fprint(writer, "\t")
-		}
-		fmt.Fprint(writer, strings.Repeat("-", len(columns[i].Title)))
-	}
-	fmt.Fprintln(writer)
+	lines = append(lines, strings.Join(titles, "\t"), strings.Join(underlines, "\t"))
 	for _, row := range filtered {
-		for i, column := range columns {
-			if i > 0 {
-				fmt.Fprint(writer, "\t")
-			}
-			fmt.Fprint(writer, displayListValue(row[column.Key]))
+		values := make([]string, 0, len(columns))
+		for _, column := range columns {
+			values = append(values, displayListValue(row[column.Key]))
 		}
-		fmt.Fprintln(writer)
+		lines = append(lines, strings.Join(values, "\t"))
+	}
+	if _, err := io.WriteString(writer, strings.Join(lines, "\n")+"\n"); err != nil {
+		return err
 	}
 	return writer.Flush()
 }
