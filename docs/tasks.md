@@ -62,3 +62,12 @@ ecsctl stop-task --cluster production --task <task-id-or-arn>
 ```
 
 This requests that ECS stop the task; the task can remain in `STOPPING` briefly. Stopping it interrupts its current work. It does not delete the task definition or create a replacement task. Use `--reason` to include a reason in the stop request.
+
+## Investigate a task that stopped or failed
+
+Find stopped tasks, then inspect ECS stop details, per-container exit codes and errors, and network attachment information:
+
+```bash
+ecsctl list tasks --cluster production --desired-status STOPPED
+ecsctl describe task <task-id-or-arn> --cluster production
+```

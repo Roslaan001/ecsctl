@@ -93,3 +93,11 @@ ecsctl describe service <service-name> --cluster <cluster-name> [flags]
 ```bash
 ecsctl describe service my-service --cluster my-cluster
 ```
+
+### 3. Describe Task
+
+Inspect a task's status, stop reason, container exit codes and reasons, timestamps, and network attachments:
+
+```bash
+ecsctl describe task <task-id-or-arn> --cluster <cluster-name>
+```
