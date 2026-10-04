@@ -48,6 +48,12 @@ def main() -> int:
     if result.returncode:
         return result.returncode
 
+    # Release Please generates its own body and owns the release checklist; keep
+    # validating its Conventional Commit title, but don't require our author template.
+    head = pull_request.get("head") or {}
+    if (head.get("ref") or "").startswith("release-please--branches--"):
+        return 0
+
     body = COMMENT_PATTERN.sub("", body)
     failed = False
     for name in SECTIONS:
