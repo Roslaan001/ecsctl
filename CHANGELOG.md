@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/Roslaan001/ecsctl/compare/v0.3.0...v0.4.0) (2026-10-04)
+
+
+### Features
+
+* enrich ECS list output ([#29](https://github.com/Roslaan001/ecsctl/issues/29)) ([5d3d4c6](https://github.com/Roslaan001/ecsctl/commit/5d3d4c66aabe676e0d76bc35335081a88bd8e51b))
+* improve ECS list queries and output ([#31](https://github.com/Roslaan001/ecsctl/issues/31)) ([80bcff7](https://github.com/Roslaan001/ecsctl/commit/80bcff7ca423429ed6404bbe66fdaf37e38ae803))
+
 ## [0.3.0](https://github.com/Roslaan001/ecsctl/compare/v0.2.3...v0.3.0) (2026-10-04)
 
 
