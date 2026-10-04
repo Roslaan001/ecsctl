@@ -120,12 +120,12 @@ List resources from saved state or query live AWS resources with `--live`.
 
 | Syntax | Flags |
 |---|---|
-| `ecsctl list clusters` | `--live`, `--wide` |
-| `ecsctl list services` | `--cluster CLUSTER`, `--live`, `--wide` |
-| `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--wide` |
-| `ecsctl list task-definitions` | `--status STATUS`, `--wide` |
+| `ecsctl list clusters` | `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list services` | `--cluster CLUSTER`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
+| `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--name PREFIX`, `--status STATUS`, `--desired-status STATUS`, `--launch-type TYPE`, `--wide` |
+| `ecsctl list task-definitions` | `--status STATUS`, `--family PREFIX`, `--wide` |
 
-List output shows runtime counts for clusters and services, and task status, service, launch type, and start time for tasks. State-backed cluster lists include the recorded creation time when ecsctl created the cluster. Use `--wide` to include full ARNs. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
+All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and creation time. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. State-backed cluster/service lists show saved inventory; runtime status filters use live AWS data. State-backed cluster lists include the recorded creation time when ecsctl created the cluster. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
 
 ### `deploy`
 
