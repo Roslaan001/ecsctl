@@ -55,3 +55,4 @@ nav:
   - Resource Inspection: inspection.md
   - Remote State: state.md
   - CLI Reference: reference.md
+  - Release Notes and Upgrades: releases.md

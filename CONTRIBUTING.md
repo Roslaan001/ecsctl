@@ -13,6 +13,10 @@ ci: validate commit messages
 
 Use one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, or `revert`. Keep the subject to 72 characters. Add a scope when it helps, such as `fix(state): ...`; mark breaking changes with `!`, such as `feat!: ...`.
 
+Write the subject as a concise, user-facing summary because Release Please uses it in the changelog. `feat`, `fix`, `perf`, `docs`, and `revert` changes appear in release notes. Build, CI, test, style, refactor, and chore entries are omitted from the published changelog. Use `fix(security): ...` for security fixes so they appear with bug fixes and retain their scope.
+
+For breaking changes, mark the subject with `!` and add a `BREAKING CHANGE:` footer that explains the impact and migration steps. Add detailed, version-specific instructions to [the release and upgrade guide](docs/releases.md) and link that guide from the release notes when the change needs more than a short explanation.
+
 Pull request titles follow the same Conventional Commit format. The PR metadata check also requires non-empty Summary, Validation, and Operational impact sections in the description.
 
 Do not put GitHub issue-closing references in commit messages. Keywords such as `close`, `fix`, or `resolve` followed by an issue number can close an issue when the commit is merged. Put issue-closing references in the pull request description instead. A Conventional Commit such as `fix(state): prevent stale lock removal` is fine when it has no issue-closing reference. Avoid `@mentions` in commit messages because GitHub can notify mentioned users again whenever the pull request is updated.

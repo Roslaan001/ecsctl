@@ -79,4 +79,5 @@ This command creates the bucket if it does not exist, enables bucket versioning,
 - [Remote state](state.md)
 - [Task definitions and one-off tasks](tasks.md)
 - [Complete CLI reference](reference.md)
+- [Release notes and upgrade guidance](releases.md)
 - [Uninstallation](uninstallation.md)
