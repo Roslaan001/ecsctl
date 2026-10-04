@@ -12,6 +12,7 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | `describe` | Show a cluster or service. |
 | `list` | List clusters, services, or tasks. |
 | `deploy` | Roll out a new service image. |
+| `rollback` | Restore the task definition from the previous completed service deployment. |
 | `scale` | Change a service's desired task count. |
 | `logs` | Read or follow service logs. |
 | `exec` | Open a shell or run a command in a task. |
@@ -142,6 +143,19 @@ ecsctl deploy SERVICE --cluster CLUSTER --image IMAGE [--container NAME]
 | `--image` | string | New image and tag, such as `nginx:latest`. Required. |
 | `--container` | string | Container to update. Defaults to the first container. |
 | `--wait` | boolean | Wait for the deployment to complete. |
+
+### `rollback`
+
+Restore the most recent completed deployment that used a different task definition.
+
+```text
+ecsctl rollback SERVICE --cluster CLUSTER [--wait]
+```
+
+`--wait` polls until the rollback deployment is stable. Rollback supports ECS
+rolling deployment controllers; CodeDeploy and external controllers are rejected.
+Use `ecsctl describe service SERVICE --cluster CLUSTER` to inspect deployment
+task definitions, creation times, and rollout reasons before or after rollback.
 
 ### `scale`
 

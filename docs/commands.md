@@ -26,6 +26,20 @@ If your task definition contains multiple containers, specify the target contain
 ecsctl deploy my-service --cluster my-cluster --image redis:7.2-alpine --container cache
 ```
 
+## ↩️ Rolling Back a Deployment (`rollback`)
+
+Restore the task definition used by the most recent completed deployment before
+the service's current task definition:
+
+```bash
+ecsctl rollback my-service --cluster my-cluster --wait
+```
+
+Use `ecsctl describe service my-service --cluster my-cluster` to review task
+definition revisions, deployment timestamps, and rollout reasons. Rollback
+supports ECS rolling deployments. Services managed by CodeDeploy or an external
+deployment controller must be rolled back through that controller.
+
 ---
 
 ## 📈 Scaling Services (`scale`)
