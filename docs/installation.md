@@ -56,6 +56,15 @@ After installing, open a new terminal if your `PATH` changed and confirm the com
 ecsctl version
 ```
 
+Check whether a newer stable release is available with:
+
+```bash
+ecsctl version --check
+```
+
+The command prints the install command for your platform when an update is
+available. It checks GitHub Releases and does not change your installation.
+
 ## Verify release provenance
 
 Starting with v0.2.3, release archives include a GitHub artifact attestation

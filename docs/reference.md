@@ -19,7 +19,7 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | `register task-definition` | Register a task definition from JSON. |
 | `run-task` / `stop-task` | Start or stop standalone tasks. |
 | `state` | Manage remote state and tracked resources. |
-| `version` | Print build information. |
+| `version` | Print build information; `--check` checks for a newer GitHub release. |
 | `completion` | Install shell autocompletion. |
 | `help` | Show help for a command. |
 
@@ -265,4 +265,7 @@ ecsctl help state import
 
 ## `version`
 
-Print the ecsctl version, commit, and build information.
+Print the ecsctl version, commit, and build information. Pass `--check` to check
+the latest stable GitHub release and get the platform's install command if an
+update is available. This check requires an internet connection and does not
+modify the installed binary.
