@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/roslaan001/ecsctl/pkg/aws"
@@ -100,7 +101,7 @@ func applyCluster(client *aws.Client, file string, session *stateSession, client
 			fmt.Printf("  Cluster %q is up to date.\n", cfg.Name)
 		}
 		if !applyDryRun && session != nil {
-			if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+			if err := recordClusterState(session, client, cfg, resolvedRegion, time.Time{}); err != nil {
 				return fmt.Errorf("cluster updated but remote state was not updated: %w", err)
 			}
 		}
@@ -113,6 +114,7 @@ func applyCluster(client *aws.Client, file string, session *stateSession, client
 	}
 
 	fmt.Printf("+ Creating cluster %q in %s...\n", cfg.Name, resolvedRegion)
+	createStartedAt := time.Now().UTC()
 	if err := client.CreateCluster(context.Background(), cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
@@ -120,7 +122,7 @@ func applyCluster(client *aws.Client, file string, session *stateSession, client
 	fmt.Printf("✓ Cluster %q created.\n", cfg.Name)
 
 	if session != nil {
-		if err := recordClusterState(session, client, cfg, resolvedRegion); err != nil {
+		if err := recordClusterState(session, client, cfg, resolvedRegion, createStartedAt); err != nil {
 			return fmt.Errorf("cluster created but remote state was not updated: %w", err)
 		}
 	}

@@ -25,7 +25,7 @@ var listTasksCmd = &cobra.Command{
 			return fmt.Errorf("creating AWS client: %w", err)
 		}
 
-		if err := client.PrintTasks(context.Background(), listTasksCluster, listTasksService); err != nil {
+		if err := client.PrintTasks(context.Background(), listTasksCluster, listTasksService, listWide); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}

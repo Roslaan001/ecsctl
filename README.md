@@ -242,6 +242,7 @@ ecsctl list services --cluster my-cluster
 # List running tasks in a cluster or service
 ecsctl list tasks --cluster my-cluster
 ecsctl list tasks --cluster my-cluster --service my-service
+ecsctl list task-definitions
 ```
 
 ### Describe

@@ -47,6 +47,7 @@ type ecsIface interface {
 	ListServices(ctx context.Context, params *ecs.ListServicesInput, optFns ...func(*ecs.Options)) (*ecs.ListServicesOutput, error)
 	UpdateService(ctx context.Context, params *ecs.UpdateServiceInput, optFns ...func(*ecs.Options)) (*ecs.UpdateServiceOutput, error)
 	DescribeTaskDefinition(ctx context.Context, params *ecs.DescribeTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTaskDefinitionOutput, error)
+	ListTaskDefinitions(ctx context.Context, params *ecs.ListTaskDefinitionsInput, optFns ...func(*ecs.Options)) (*ecs.ListTaskDefinitionsOutput, error)
 	RegisterTaskDefinition(ctx context.Context, params *ecs.RegisterTaskDefinitionInput, optFns ...func(*ecs.Options)) (*ecs.RegisterTaskDefinitionOutput, error)
 	DescribeTasks(ctx context.Context, params *ecs.DescribeTasksInput, optFns ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error)
 	ListTasks(ctx context.Context, params *ecs.ListTasksInput, optFns ...func(*ecs.Options)) (*ecs.ListTasksOutput, error)
@@ -1010,9 +1011,13 @@ func (c *Client) ExecInTask(ctx context.Context, opts ExecOptions) error {
 }
 
 // ListClusters lists all ECS clusters in the account/region and prints them.
-func (c *Client) ListClusters(ctx context.Context) error {
+func (c *Client) ListClusters(ctx context.Context, wide bool) error {
 	var nextToken *string
-	fmt.Printf("%-40s %-10s %s\n", "NAME", "STATUS", "ARN")
+	if wide {
+		fmt.Printf("%-30s %-12s %-10s %-10s %-10s %-34s %s\n", "NAME", "STATUS", "SERVICES", "RUNNING", "PENDING", "CAPACITY PROVIDERS", "ARN")
+	} else {
+		fmt.Printf("%-30s %-12s %-10s %-10s %-10s %s\n", "NAME", "STATUS", "SERVICES", "RUNNING", "PENDING", "CAPACITY PROVIDERS")
+	}
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	for {
@@ -1035,15 +1040,19 @@ func (c *Client) ListClusters(ctx context.Context) error {
 		}
 
 		for _, cl := range descOut.Clusters {
-			status := ""
-			if cl.Status != nil {
-				status = *cl.Status
+			providers := strings.Join(cl.CapacityProviders, ",")
+			if providers == "" {
+				providers = "-"
 			}
-			fmt.Printf("%-40s %-10s %s\n",
-				aws.ToString(cl.ClusterName),
-				status,
-				aws.ToString(cl.ClusterArn),
-			)
+			if wide {
+				fmt.Printf("%-30s %-12s %-10d %-10d %-10d %-34s %s\n",
+					aws.ToString(cl.ClusterName), aws.ToString(cl.Status), cl.ActiveServicesCount,
+					cl.RunningTasksCount, cl.PendingTasksCount, providers, aws.ToString(cl.ClusterArn))
+			} else {
+				fmt.Printf("%-30s %-12s %-10d %-10d %-10d %s\n",
+					aws.ToString(cl.ClusterName), aws.ToString(cl.Status), cl.ActiveServicesCount,
+					cl.RunningTasksCount, cl.PendingTasksCount, providers)
+			}
 		}
 
 		if listOut.NextToken == nil {
@@ -1055,9 +1064,13 @@ func (c *Client) ListClusters(ctx context.Context) error {
 }
 
 // ListServices lists all services in a given ECS cluster and prints them.
-func (c *Client) ListServices(ctx context.Context, clusterName string) error {
+func (c *Client) ListServices(ctx context.Context, clusterName string, wide bool) error {
 	var nextToken *string
-	fmt.Printf("%-40s %-10s %-8s %-8s %s\n", "NAME", "STATUS", "DESIRED", "RUNNING", "TASK DEFINITION")
+	if wide {
+		fmt.Printf("%-30s %-12s %-8s %-8s %-8s %-30s %-55s %s\n", "NAME", "STATUS", "DESIRED", "RUNNING", "PENDING", "TASK DEFINITION", "SERVICE ARN", "TASK DEFINITION ARN")
+	} else {
+		fmt.Printf("%-30s %-12s %-8s %-8s %-8s %s\n", "NAME", "STATUS", "DESIRED", "RUNNING", "PENDING", "TASK DEFINITION")
+	}
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	for {
@@ -1082,13 +1095,17 @@ func (c *Client) ListServices(ctx context.Context, clusterName string) error {
 		}
 
 		for _, svc := range descOut.Services {
-			fmt.Printf("%-40s %-10s %-8d %-8d %s\n",
-				aws.ToString(svc.ServiceName),
-				aws.ToString(svc.Status),
-				svc.DesiredCount,
-				svc.RunningCount,
-				aws.ToString(svc.TaskDefinition),
-			)
+			taskDefinition := shortTaskDefinitionARN(aws.ToString(svc.TaskDefinition))
+			if wide {
+				fmt.Printf("%-30s %-12s %-8d %-8d %-8d %-30s %-55s %s\n",
+					aws.ToString(svc.ServiceName), aws.ToString(svc.Status), svc.DesiredCount,
+					svc.RunningCount, svc.PendingCount, taskDefinition,
+					aws.ToString(svc.ServiceArn), aws.ToString(svc.TaskDefinition))
+			} else {
+				fmt.Printf("%-30s %-12s %-8d %-8d %-8d %s\n",
+					aws.ToString(svc.ServiceName), aws.ToString(svc.Status), svc.DesiredCount,
+					svc.RunningCount, svc.PendingCount, taskDefinition)
+			}
 		}
 
 		if listOut.NextToken == nil {
@@ -1487,7 +1504,7 @@ func (c *Client) reconcileTags(ctx context.Context, arn string, current []types.
 }
 
 // PrintTasks lists running tasks in a cluster, optionally filtered by service.
-func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string) error {
+func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string, wide bool) error {
 	input := &ecs.ListTasksInput{
 		Cluster: aws.String(clusterName),
 	}
@@ -1512,7 +1529,11 @@ func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string
 		return fmt.Errorf("describing tasks: %w", err)
 	}
 
-	fmt.Printf("%-36s %-12s %-12s %-30s %s\n", "TASK ID", "STATUS", "LAUNCH TYPE", "STARTED AT", "TASK DEFINITION")
+	if wide {
+		fmt.Printf("%-20s %-12s %-24s %-12s %-20s %-30s %-55s %s\n", "TASK ID", "STATUS", "SERVICE", "LAUNCH TYPE", "STARTED AT", "TASK DEFINITION", "TASK ARN", "TASK DEFINITION ARN")
+	} else {
+		fmt.Printf("%-20s %-12s %-24s %-12s %-20s %s\n", "TASK ID", "STATUS", "SERVICE", "LAUNCH TYPE", "STARTED AT", "TASK DEFINITION")
+	}
 	fmt.Println("────────────────────────────────────────────────────────────────────────────────────────────────────")
 
 	for _, task := range descOut.Tasks {
@@ -1527,26 +1548,89 @@ func (c *Client) PrintTasks(ctx context.Context, clusterName, serviceName string
 			startedAt = task.StartedAt.Format("2006-01-02 15:04:05")
 		}
 
-		// Short task definition
-		td := aws.ToString(task.TaskDefinitionArn)
-		if idx := len(td) - 1; idx > 0 {
-			for i := idx; i >= 0; i-- {
-				if td[i] == '/' {
-					td = td[i+1:]
-					break
-				}
-			}
+		service := "-"
+		if group := aws.ToString(task.Group); strings.HasPrefix(group, "service:") {
+			service = strings.TrimPrefix(group, "service:")
 		}
+		tdARN := aws.ToString(task.TaskDefinitionArn)
+		displayTD := shortTaskDefinitionARN(tdARN)
 
-		fmt.Printf("%-36s %-12s %-12s %-30s %s\n",
-			taskID,
-			aws.ToString(task.LastStatus),
-			string(task.LaunchType),
-			startedAt,
-			td,
-		)
+		if wide {
+			fmt.Printf("%-20s %-12s %-24s %-12s %-20s %-30s %-55s %s\n",
+				taskID, aws.ToString(task.LastStatus), service, string(task.LaunchType),
+				startedAt, displayTD, aws.ToString(task.TaskArn), tdARN)
+		} else {
+			fmt.Printf("%-20s %-12s %-24s %-12s %-20s %s\n",
+				taskID, aws.ToString(task.LastStatus), service, string(task.LaunchType),
+				startedAt, displayTD)
+		}
 	}
 	return nil
+}
+
+// ListTaskDefinitions lists task definition revisions with the requested status.
+func (c *Client) ListTaskDefinitions(ctx context.Context, status types.TaskDefinitionStatus, wide bool) error {
+	if status == "" {
+		status = types.TaskDefinitionStatusActive
+	}
+
+	if wide {
+		fmt.Printf("%-40s %-10s %-18s %s\n", "FAMILY", "REVISION", "STATUS", "ARN")
+	} else {
+		fmt.Printf("%-40s %-10s %s\n", "FAMILY", "REVISION", "STATUS")
+	}
+	fmt.Println("--------------------------------------------------------------------------------")
+
+	var nextToken *string
+	found := false
+	for {
+		out, err := c.ecs.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
+			Status:    status,
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return fmt.Errorf("listing task definitions: %w", err)
+		}
+
+		for _, arn := range out.TaskDefinitionArns {
+			family, revision := taskDefinitionFamilyAndRevision(arn)
+			if wide {
+				fmt.Printf("%-40s %-10s %-18s %s\n", family, revision, status, arn)
+			} else {
+				fmt.Printf("%-40s %-10s %s\n", family, revision, status)
+			}
+			found = true
+		}
+
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+	if !found {
+		fmt.Printf("No %s task definitions found.\n", strings.ToLower(string(status)))
+	}
+	return nil
+}
+
+func shortTaskDefinitionARN(arn string) string {
+	family, revision := taskDefinitionFamilyAndRevision(arn)
+	if revision == "" {
+		return arn
+	}
+	return family + ":" + revision
+}
+
+func taskDefinitionFamilyAndRevision(arn string) (string, string) {
+	definition := arn
+	if slash := strings.LastIndex(definition, "/"); slash >= 0 {
+		definition = definition[slash+1:]
+	}
+	colon := strings.LastIndex(definition, ":")
+	if colon < 0 {
+		return definition, ""
+	}
+	return definition[:colon], definition[colon+1:]
 }
 
 // DescribeClusterResource fetches a cluster from AWS and returns it as a state.Resource.
