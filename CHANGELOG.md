@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Roslaan001/ecsctl/compare/v0.2.3...v0.3.0) (2026-10-04)
+
+
+### Features
+
+* install shell completions ([#27](https://github.com/Roslaan001/ecsctl/issues/27)) ([0d22f1f](https://github.com/Roslaan001/ecsctl/commit/0d22f1f706788f081566372b557226f069794862))
+
 ## [0.2.3](https://github.com/Roslaan001/ecsctl/compare/v0.2.2...v0.2.3) (2026-10-02)
 
 
