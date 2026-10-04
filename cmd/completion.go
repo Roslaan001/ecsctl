@@ -57,12 +57,13 @@ func installCompletion(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create completion file: %w", err)
 	}
-	if err := generate(file); err != nil {
-		file.Close()
-		return fmt.Errorf("generate %s completion: %w", shell, err)
+	generateErr := generate(file)
+	closeErr := file.Close()
+	if generateErr != nil {
+		return fmt.Errorf("generate %s completion: %w", shell, generateErr)
 	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("save completion file: %w", err)
+	if closeErr != nil {
+		return fmt.Errorf("save completion file: %w", closeErr)
 	}
 
 	if shell == "zsh" {
