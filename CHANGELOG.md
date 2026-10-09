@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Roslaan001/ecsctl/compare/v0.5.0...v0.5.1) (2026-10-09)
+
+
+### Maintenance
+
+* **deps:** bump the go-dependencies group with 3 updates ([#43](https://github.com/Roslaan001/ecsctl/issues/43)) ([fc976fd](https://github.com/Roslaan001/ecsctl/commit/fc976fddf3ffdec3678a1e9ac8ee753bc0a5bc40))
+
 ## [0.5.0](https://github.com/Roslaan001/ecsctl/compare/v0.4.0...v0.5.0) (2026-10-04)
 
 
