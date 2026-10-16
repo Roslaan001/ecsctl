@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/Roslaan001/ecsctl/compare/v0.5.0...v0.5.1) (2026-10-16)
+
+
+### Maintenance
+
+* **deps:** bump goreleaser/goreleaser-action from 7.2.3 to 7.3.0 ([#45](https://github.com/Roslaan001/ecsctl/issues/45)) ([dfcf770](https://github.com/Roslaan001/ecsctl/commit/dfcf77056859880fcd92a15d465f9df7e12ec557))
+* **deps:** bump the go-dependencies group with 12 updates ([#46](https://github.com/Roslaan001/ecsctl/issues/46)) ([db38d85](https://github.com/Roslaan001/ecsctl/commit/db38d85d2c360cbe2299ec267e4acc4fc009cc94))
+* **deps:** bump the go-dependencies group with 3 updates ([#43](https://github.com/Roslaan001/ecsctl/issues/43)) ([fc976fd](https://github.com/Roslaan001/ecsctl/commit/fc976fddf3ffdec3678a1e9ac8ee753bc0a5bc40))
+
 ## [0.5.0](https://github.com/Roslaan001/ecsctl/compare/v0.4.0...v0.5.0) (2026-10-04)
 
 
