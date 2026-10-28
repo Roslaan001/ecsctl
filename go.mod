@@ -5,11 +5,11 @@ go 1.26
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
-	github.com/aws/aws-sdk-go-v2/service/applicationautoscaling v1.51.4
+	github.com/aws/aws-sdk-go-v2/service/applicationautoscaling v1.51.5
 	github.com/aws/aws-sdk-go-v2/service/autoscaling v1.78.4
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.89.3
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.338.4
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.100.3
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.90.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.339.0
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.101.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.64.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.79.3
