@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/roslaan001/ecsctl/pkg/aws"
 	"github.com/spf13/cobra"
 )
 
@@ -11,6 +12,7 @@ var (
 	region       string
 	profile      string
 	stateContext string // named state context, e.g. "prod", "staging"
+	debug        bool
 )
 
 var rootCmd = &cobra.Command{
@@ -30,6 +32,11 @@ Examples:
   ecsctl delete service my-service
   ecsctl delete cluster my-cluster`,
 	SilenceUsage: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if debug {
+			aws.SetDebug(true)
+		}
+	},
 }
 
 // Execute runs the root command.
@@ -46,6 +53,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&region, "region", "", "AWS region (overrides config/env)")
 	rootCmd.PersistentFlags().StringVar(&profile, "profile", "", "AWS profile to use")
 	rootCmd.PersistentFlags().StringVar(&stateContext, "context", "", "State context to use (overrides current context in ~/.ecsctl/config.yaml)")
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable verbose AWS SDK request and response wire logging")
 
 	// Register subcommand groups
 	rootCmd.AddCommand(createCmd)

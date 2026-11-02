@@ -500,3 +500,30 @@ func TestDeployServiceOmitsEmptyTaskDefinitionTags(t *testing.T) {
 		t.Fatalf("empty task definition tags should be omitted, got %#v", got)
 	}
 }
+
+func TestSetDebug(t *testing.T) {
+	defer SetDebug(false)
+
+	SetDebug(true)
+	if !globalDebug.Load() {
+		t.Errorf("expected globalDebug to be true after SetDebug(true)")
+	}
+
+	SetDebug(false)
+	if globalDebug.Load() {
+		t.Errorf("expected globalDebug to be false after SetDebug(false)")
+	}
+}
+
+func TestWithDebugOption(t *testing.T) {
+	var opts clientOptions
+	WithDebug(true)(&opts)
+	if opts.debug == nil || !*opts.debug {
+		t.Errorf("expected opts.debug to be true")
+	}
+
+	WithDebug(false)(&opts)
+	if opts.debug == nil || *opts.debug {
+		t.Errorf("expected opts.debug to be false")
+	}
+}
