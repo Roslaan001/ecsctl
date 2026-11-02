@@ -81,7 +81,18 @@ architecture. The installer also checks the archive's SHA-256 checksum.
 
 ---
 
-## 2. Using `go install`
+## 2. macOS / Linux (via Homebrew Tap)
+
+You can install `ecsctl` via Homebrew using this repository as a tap:
+
+```bash
+brew tap Roslaan001/ecsctl https://github.com/Roslaan001/ecsctl
+brew install ecsctl
+```
+
+---
+
+## 3. Using `go install`
 
 If you have Go installed on your system, you can build and install the latest release directly via Go's package manager:
 
@@ -93,7 +104,7 @@ Ensure your Go binary path (`$GOPATH/bin` or `$HOME/go/bin`) is included in your
 
 ---
 
-## 3. Building From Source
+## 4. Building From Source
 
 For development or compiling manually, clone the repository and use the provided `Makefile`:
 

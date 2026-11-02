@@ -293,6 +293,7 @@ Use `state` to manage remote state contexts and tracked resources.
 | `import cluster` | `ecsctl state import cluster NAME` | Import a cluster. Supports `--context` to select a context. |
 | `import service` | `ecsctl state import service NAME --cluster CLUSTER` | Import a service. `--cluster` is required; supports `--context`. |
 | `import express` | `ecsctl state import express NAME_OR_ARN [--cluster CLUSTER]` | Import an Express service and capture its configuration. Supports `--context`. |
+| `import gateway` | `ecsctl state import gateway NAME` | Import an ECS Gateway and capture its configuration. Supports `--context`. |
 | `config` | `ecsctl state config RESOURCE NAME [--cluster CLUSTER]` | Print captured YAML. Use `--cluster` to select a service in a cluster; an active context is required. |
 | `show` | `ecsctl state show` | Show the active context and tracked resources. |
 | `drift` | `ecsctl state drift` | Compare tracked configuration with live ECS resources. |
