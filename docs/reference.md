@@ -95,7 +95,29 @@ ecsctl create service --name NAME --cluster CLUSTER --task-definition FAMILY:REV
 | `--security-groups` | string slice | Security group IDs. |
 | `--assign-public-ip` | string | `ENABLED` or `DISABLED`. Defaults to `ENABLED`. |
 | `--tags` | string array | Tags in `key=value` form. |
+| `--gateway-port` | string | Named container port to route ECS Gateway ingress traffic to. |
 | `--wait` | boolean | Wait for the service to reach steady state. |
+
+#### `create gateway`
+
+```text
+ecsctl create gateway -f FILE
+ecsctl create gateway --name NAME --infra-role-arn ARN [--scheme internet-facing|internal] [--subnets LIST] [--security-groups LIST] [--clusters LIST]
+```
+
+| Flag | Type | Description |
+|---|---|---|
+| `-f, --file` | string | YAML configuration file. |
+| `--name` | string | Gateway name. Required when `-f` is omitted. |
+| `--infra-role-arn` | string | IAM infrastructure role ARN for gateway management. Required when `-f` is omitted. |
+| `--scheme` | string | Load balancer scheme: `internet-facing` (default) or `internal`. |
+| `--subnets` | string slice | Subnet IDs for managed load balancers. |
+| `--security-groups` | string slice | Inbound security group IDs. |
+| `--max-albs` | int32 | Maximum ALBs the gateway can manage (default: 10). |
+| `--web-acl-arn` | string | WAF Web ACL ARN to attach. |
+| `--deletion-protection` | boolean | Enable deletion protection (default: true). |
+| `--clusters` | string slice | Clusters to associate with the gateway. |
+| `--tags` | string array | Tags in `key=value` format (repeatable). |
 
 ### `delete`
 
@@ -105,6 +127,7 @@ Delete a resource by name.
 |---|---|
 | `ecsctl delete cluster NAME` | Optional `--force` to delete its services first; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
 | `ecsctl delete service NAME` | Required `--cluster CLUSTER`; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
+| `ecsctl delete gateway NAME` | Delete an Amazon ECS Gateway. |
 
 ### `describe`
 
@@ -115,6 +138,7 @@ Show live configuration and runtime status.
 | `ecsctl describe cluster NAME` | — |
 | `ecsctl describe service NAME` | `--cluster CLUSTER` |
 | `ecsctl describe task TASK` | `--cluster CLUSTER` |
+| `ecsctl describe gateway NAME` | Optional `--resources` to inspect managed ALBs and routes |
 
 ### `list`
 
@@ -126,6 +150,7 @@ Cluster and service lists query live AWS by default and add tracking metadata fr
 | `ecsctl list services` | `--cluster CLUSTER`, `--state`, `--live`, `--wide`, `--name PREFIX`, `--status STATUS` |
 | `ecsctl list tasks` | `--cluster CLUSTER`, optional `--service NAME`, `--name PREFIX`, `--status STATUS`, `--desired-status STATUS`, `--launch-type TYPE`, `--wide` |
 | `ecsctl list task-definitions` | `--status STATUS`, `--family PREFIX`, `--wide` |
+| `ecsctl list gateways` | `--state`, `--live`, `--wide` |
 
 All list commands support `--output table|json`, `--sort FIELD`, and `--limit N`. Live service output includes rollout status, a readiness indicator, desired/running/pending counts, launch type, task definition, and AWS creation time. Cluster/service results include tracking metadata when available. State-only mode uses the same output fields, with null live fields. Task output includes ECS health, last/desired status, service, launch type, CPU, memory, and timestamps. Task-definition output includes CPU, memory, and registration time. `--status` filters use live AWS and cannot be combined with `--state`. JSON output includes ARNs; `--wide` adds ARNs to table output. Task definitions list active revisions by default; `--status` also accepts `INACTIVE` and `DELETE_IN_PROGRESS`.
 

@@ -43,6 +43,26 @@
     "placementConstraints": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "expression": { "type": "string" } }, "required": ["type"], "additionalProperties": false } },
     "placementStrategy": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "field": { "type": "string" } }, "required": ["type"], "additionalProperties": false } },
     "serviceConnect": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "namespace": { "type": "string" }, "services": { "type": "array", "items": { "type": "object", "properties": { "portName": { "type": "string" }, "discoveryName": { "type": "string" }, "ingressPortOverride": { "type": "integer" }, "clientAliases": { "type": "array", "items": { "type": "object", "properties": { "dnsName": { "type": "string" }, "port": { "type": "integer" } }, "required": ["port"], "additionalProperties": false } } }, "required": ["portName"], "additionalProperties": false } } }, "required": ["enabled"], "additionalProperties": false },
+    "gatewayConnector": {
+      "type": "object",
+      "properties": {
+        "portName": { "type": "string", "description": "The container port name that traffic routes to." },
+        "healthCheck": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "protocol": { "type": "string", "enum": ["HTTP", "HTTPS"] },
+            "intervalSeconds": { "type": "integer", "minimum": 5, "maximum": 300 },
+            "timeoutSeconds": { "type": "integer", "minimum": 2, "maximum": 120 },
+            "healthyThresholdCount": { "type": "integer", "minimum": 2, "maximum": 10 },
+            "unhealthyThresholdCount": { "type": "integer", "minimum": 2, "maximum": 10 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["portName"],
+      "additionalProperties": false
+    },
     "autoScaling": { "type": "object", "properties": { "minCapacity": { "type": "integer", "minimum": 0 }, "maxCapacity": { "type": "integer", "minimum": 1 }, "metric": { "type": "string", "enum": ["CPU", "Memory"] }, "targetValue": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["minCapacity", "maxCapacity"], "additionalProperties": false },
     "tags": { "type": "object", "additionalProperties": { "type": "string" } }
   },
