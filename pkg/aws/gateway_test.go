@@ -222,3 +222,105 @@ func TestGatewayTrustPolicy(t *testing.T) {
 		t.Errorf("expected trust policy to contain %q, got %q", expectedCondition, p2)
 	}
 }
+
+func TestDescribeGatewayResource(t *testing.T) {
+	delProt := true
+	mock := &mockECS{
+		describeGatewayOut: &ecs.DescribeGatewayOutput{
+			Gateway: &types.Gateway{
+				Name:                  aws.String("my-gw"),
+				GatewayArn:            aws.String("arn:aws:ecs:us-east-1:123456789012:gateway/my-gw"),
+				InfrastructureRoleArn: aws.String("arn:aws:iam::123456789012:role/my-role"),
+				DeletionProtection:    &delProt,
+				Status:                types.GatewayStatusActive,
+				Configuration: &types.DescribeGatewayConfigurationMemberHostSharedAlb{
+					Value: types.DescribeGatewayAlbConfiguration{
+						Scheme: types.GatewayElbSchemeInternetFacing,
+						NetworkConfiguration: &types.GatewayElbNetworkConfiguration{
+							Subnets:              []string{"subnet-1", "subnet-2"},
+							InboundSecurityGroup: aws.String("sg-abc"),
+						},
+					},
+				},
+				Tags: []types.Tag{
+					{Key: aws.String("Env"), Value: aws.String("Production")},
+				},
+			},
+		},
+		listGatewayClusterAssocOut: &ecs.ListGatewayClusterAssociationsOutput{
+			GatewayClusterAssociations: []types.GatewayClusterAssociationSummary{
+				{ClusterArn: aws.String("cluster-a")},
+				{ClusterArn: aws.String("cluster-b")},
+			},
+		},
+	}
+	client := testClient(mock)
+
+	res, err := client.DescribeGatewayResource(context.Background(), "my-gw")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Name != "my-gw" {
+		t.Errorf("expected name 'my-gw', got %q", res.Name)
+	}
+	if res.Type != "gateway" {
+		t.Errorf("expected type 'gateway', got %q", res.Type)
+	}
+	if res.CreatedBy != "imported" {
+		t.Errorf("expected createdBy 'imported', got %q", res.CreatedBy)
+	}
+	if !strings.Contains(res.Configuration, "my-gw") {
+		t.Errorf("expected configuration to contain 'my-gw', got %s", res.Configuration)
+	}
+}
+
+func TestReconcileGateway(t *testing.T) {
+	delProt := true
+	mock := &mockECS{
+		describeGatewayOut: &ecs.DescribeGatewayOutput{
+			Gateway: &types.Gateway{
+				Name:               aws.String("my-gw"),
+				DeletionProtection: &delProt,
+				Tags: []types.Tag{
+					{Key: aws.String("Env"), Value: aws.String("Production")},
+				},
+			},
+		},
+		listGatewayClusterAssocOut: &ecs.ListGatewayClusterAssociationsOutput{
+			GatewayClusterAssociations: []types.GatewayClusterAssociationSummary{
+				{ClusterArn: aws.String("cluster-a")},
+			},
+		},
+	}
+	client := testClient(mock)
+
+	// Up to date
+	cfg := &ecscfg.GatewayConfig{
+		Name:               "my-gw",
+		DeletionProtection: &delProt,
+		Clusters:           []string{"cluster-a"},
+		Tags:               map[string]string{"Env": "Production"},
+	}
+	drift, err := client.ReconcileGateway(context.Background(), cfg, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if drift {
+		t.Errorf("expected no drift, got drift=true")
+	}
+
+	// Drift in clusters
+	cfgWithMissingCluster := &ecscfg.GatewayConfig{
+		Name:               "my-gw",
+		DeletionProtection: &delProt,
+		Clusters:           []string{"cluster-a", "cluster-b"},
+		Tags:               map[string]string{"Env": "Production"},
+	}
+	drift, err = client.ReconcileGateway(context.Background(), cfgWithMissingCluster, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !drift {
+		t.Errorf("expected drift for missing cluster-b, got drift=false")
+	}
+}

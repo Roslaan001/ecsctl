@@ -69,6 +69,9 @@ ecsctl state import service my-existing-service --cluster my-existing-cluster --
 
 # Import an existing Express service by name or ARN
 ecsctl state import express my-api --cluster my-existing-cluster --region us-east-1
+
+# Import an existing Amazon ECS Gateway by name or ARN
+ecsctl state import gateway my-gateway --region us-east-1
 ```
 
 After import, ecsctl can include the resource in state-based commands. Importing does not create a local configuration file by itself.
@@ -81,6 +84,7 @@ After import, ecsctl can include the resource in state-based commands. Importing
 ecsctl state config cluster my-existing-cluster > cluster.yaml
 ecsctl state config service my-existing-service --cluster my-existing-cluster > service.yaml
 ecsctl state config express my-api --cluster my-existing-cluster > express.yaml
+ecsctl state config gateway my-gateway > gateway.yaml
 ```
 
 Review the generated file before applying or committing it. AWS may return environment values as plain text; move sensitive values to Secrets Manager and reference the secret ARN in your configuration.
