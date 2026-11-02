@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.2](https://github.com/Roslaan001/ecsctl/compare/v0.5.1...v0.5.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **ci:** exempt Dependabot and Release Please in PR validation ([#53](https://github.com/Roslaan001/ecsctl/issues/53)) ([25d85e7](https://github.com/Roslaan001/ecsctl/commit/25d85e7879279ef7a73a2eeb9a0f494bf82ec855))
+
+
+### Documentation
+
+* add issue templates and prerequisites section in readme ([#56](https://github.com/Roslaan001/ecsctl/issues/56)) ([9e1f684](https://github.com/Roslaan001/ecsctl/commit/9e1f684ac296a9181b71d0a7e1a2e13bdfd05b16))
+
+
+### Maintenance
+
+* **deps:** bump actions/setup-python from 7.0.0 to 7.1.0 ([#49](https://github.com/Roslaan001/ecsctl/issues/49)) ([8bcfbed](https://github.com/Roslaan001/ecsctl/commit/8bcfbed9a5aa3c6471fdf129f4d28a9bbeab7739))
+* **deps:** bump the go-dependencies group with 12 updates ([#50](https://github.com/Roslaan001/ecsctl/issues/50)) ([68b8eb9](https://github.com/Roslaan001/ecsctl/commit/68b8eb90d7f082149cf4f4ed4bc5e8324d8626d5))
+* **deps:** bump the go-dependencies group with 4 updates ([#47](https://github.com/Roslaan001/ecsctl/issues/47)) ([6ed9d03](https://github.com/Roslaan001/ecsctl/commit/6ed9d03d0da55138b00dbe13e76578b7ef0399c4))
+
 ## [0.5.1](https://github.com/Roslaan001/ecsctl/compare/v0.5.0...v0.5.1) (2026-10-16)
 
 
