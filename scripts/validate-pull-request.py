@@ -48,10 +48,16 @@ def main() -> int:
     if result.returncode:
         return result.returncode
 
-    # Release Please generates its own body and owns the release checklist; keep
-    # validating its Conventional Commit title, but don't require our author template.
+    # Release Please and Dependabot generate their own PR descriptions; keep
+    # validating their Conventional Commit title, but don't require our author template.
     head = pull_request.get("head") or {}
-    if (head.get("ref") or "").startswith("release-please--branches--"):
+    ref = head.get("ref") or ""
+    author = (pull_request.get("user") or {}).get("login") or ""
+    if (
+        ref.startswith("release-please--branches--")
+        or ref.startswith("dependabot/")
+        or author in ("dependabot[bot]", "app/dependabot")
+    ):
         return 0
 
     body = COMMENT_PATTERN.sub("", body)
