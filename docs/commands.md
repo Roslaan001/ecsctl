@@ -92,6 +92,9 @@ Open an interactive bash/sh session or execute a single command inside a running
 > [!IMPORTANT]
 > To use this command, install the AWS Session Manager Plugin locally and make sure ECS Exec is enabled for the task. Your AWS identity and the task's IAM role also need the permissions required by ECS Exec. See [AWS ECS Exec prerequisites](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html).
 
+> [!NOTE]
+> **Audit Logging for Compliance**: In production and regulated environments, you can audit commands and session output executed via ECS Exec by enabling CloudWatch Logs or Amazon S3 encryption and logging in your ECS cluster's `executeCommandConfiguration`.
+
 ```bash
 ecsctl exec <service-name> --cluster <cluster-name> [flags]
 ```
@@ -125,4 +128,7 @@ ecsctl apply -f service.yaml --debug
 ```
 
 This streams the raw AWS wire traffic and request IDs to `stderr`, making it easy to isolate API issues and file AWS support requests.
+
+> [!WARNING]
+> Debug logging dumps raw HTTP wire traffic including request and response bodies. While AWS authentication headers are redacted automatically by the AWS SDK, bodies for commands such as `ecsctl apply` may contain sensitive environment variables or secret ARNs. Always review and scrub logs before sharing them in public bug reports or chats.
 
