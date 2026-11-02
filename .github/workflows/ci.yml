@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -30,8 +34,19 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Run tests
-        run: go test ./... -v -race -count=1
+      - name: Run tests with coverage
+        run: |
+          go test ./... -v -race -count=1 -coverprofile=coverage.out -covermode=atomic
+          go tool cover -func=coverage.out | tee coverage.txt
+          echo "### Test & Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 1 coverage.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
 
       - name: Verify no uncommitted changes
         run: git diff --exit-code
@@ -85,6 +100,17 @@ jobs:
 
       - name: Lint shell scripts
         run: git ls-files -z -- '*.sh' | xargs -0 -r shellcheck
+
+      - name: Validate GoReleaser config
+        uses: goreleaser/goreleaser-action@v7.3.0
+        with:
+          version: v2.18.2
+          args: check
+
+      - name: Validate JSON schemas and examples
+        run: |
+          pip install --upgrade jsonschema pyyaml
+          python3 scripts/validate-schemas.py
 
   cross-build:
     name: Cross-build (${{ matrix.goos }}/${{ matrix.goarch }})
