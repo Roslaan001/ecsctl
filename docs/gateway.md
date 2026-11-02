@@ -208,8 +208,16 @@ ecsctl gateway disassociate --gateway my-gateway --cluster staging-cluster
 
 ### 6. Delete a Gateway
 ```bash
+# Preview what would be deleted
+ecsctl delete gateway my-gateway --dry-run
+
+# Interactive deletion (prompts to type resource name)
 ecsctl delete gateway my-gateway
-# Or:
-ecsctl gateway delete my-gateway
+
+# Non-interactive deletion (for CI / scripts)
+ecsctl delete gateway my-gateway --yes
+
+# Alternatively via the gateway command group:
+ecsctl gateway delete my-gateway --yes
 ```
-*(Note: If deletion protection is enabled, disable it in AWS or delete with protection disabled).*
+*(Note: If deletion protection is enabled, delete with `--deletion-protection=false` or disable protection first).*

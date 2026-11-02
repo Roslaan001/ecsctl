@@ -145,12 +145,21 @@ var describeGatewayCmd = &cobra.Command{
 
 // deleteGatewayCmd deletes an ECS Gateway.
 var deleteGatewayCmd = &cobra.Command{
-	Use:     "gateway [name-or-arn]",
-	Short:   "Delete an ECS Gateway",
-	Args:    cobra.ExactArgs(1),
-	Example: `  ecsctl delete gateway my-gateway`,
+	Use:   "gateway [name-or-arn]",
+	Short: "Delete an ECS Gateway",
+	Args:  cobra.ExactArgs(1),
+	Example: `  ecsctl delete gateway my-gateway
+  ecsctl delete gateway my-gateway --dry-run
+  ecsctl delete gateway my-gateway --yes`,
 	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		nameOrArn := args[0]
+		if deleteDryRun {
+			fmt.Printf("[dry-run] Would delete ECS gateway %q in %s.\n", nameOrArn, selectedRegion())
+			return nil
+		}
+		if err := confirmDelete(cmd, "gateway", nameOrArn); err != nil {
+			return err
+		}
 
 		session, err := beginStateSession(context.Background())
 		if err != nil {
@@ -170,6 +179,7 @@ var deleteGatewayCmd = &cobra.Command{
 			return err
 		}
 
+		fmt.Printf("✓ Gateway %q deleted.\n", nameOrArn)
 		if session != nil {
 			if err := session.Update(func(st *state.State) {
 				st.RemoveResource(state.ResourceTypeGateway, nameOrArn, "")
@@ -178,7 +188,6 @@ var deleteGatewayCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("✓ Gateway %q deleted.\n", nameOrArn)
 		return nil
 	},
 }
@@ -370,6 +379,10 @@ func init() {
 
 	// Flags for describe gateway
 	describeGatewayCmd.Flags().BoolVar(&gatewayShowResources, "resources", false, "Show managed load balancers and active service routes")
+
+	// Flags for delete gateway
+	deleteGatewayCmd.Flags().BoolVar(&deleteDryRun, "dry-run", false, "Show what would be deleted without calling AWS")
+	deleteGatewayCmd.Flags().BoolVar(&deleteYes, "yes", false, "Skip the confirmation prompt (required in non-interactive use)")
 
 	// Flags for associate / disassociate
 	associateGatewayCmd.Flags().StringVar(&assocGateway, "gateway", "", "Gateway name or ARN")

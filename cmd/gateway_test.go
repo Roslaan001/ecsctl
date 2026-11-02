@@ -84,4 +84,22 @@ func TestGatewayCommandsRegistered(t *testing.T) {
 	if f == nil {
 		t.Errorf("--gateway-port flag not found on createServiceCmd")
 	}
+
+	// Verify --dry-run and --yes flags on deleteGatewayCmd
+	if deleteGatewayCmd.Flags().Lookup("dry-run") == nil {
+		t.Errorf("--dry-run flag not found on deleteGatewayCmd")
+	}
+	if deleteGatewayCmd.Flags().Lookup("yes") == nil {
+		t.Errorf("--yes flag not found on deleteGatewayCmd")
+	}
+}
+
+func TestDeleteGatewayDryRun(t *testing.T) {
+	deleteDryRun = true
+	defer func() { deleteDryRun = false }()
+
+	err := deleteGatewayCmd.RunE(deleteGatewayCmd, []string{"test-gw"})
+	if err != nil {
+		t.Fatalf("expected nil error on dry-run delete, got %v", err)
+	}
 }
