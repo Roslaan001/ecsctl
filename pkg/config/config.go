@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -235,6 +236,21 @@ func DetectResourceType(path string) (string, error) {
 	}
 	if _, ok := raw["cluster"]; ok {
 		return "service", nil
+	}
+	if _, ok := raw["infrastructureRoleArn"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["configuration"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["deletionProtection"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["clusters"]; ok {
+		return "gateway", nil
+	}
+	if kind, ok := raw["kind"].(string); ok && strings.EqualFold(kind, "gateway") {
+		return "gateway", nil
 	}
 	if _, ok := raw["name"]; ok {
 		return "cluster", nil
