@@ -33,6 +33,7 @@ These flags can be used with any command or subcommand.
 | `--region` | string | AWS region to target, such as `us-east-1`. Overrides environment settings. |
 | `--profile` | string | AWS profile to use from `~/.aws/credentials`. |
 | `--context` | string | Remote state context to use for this command. |
+| `--debug` | boolean | Enable verbose AWS SDK request and response wire logging (headers, bodies, retries). |
 | `-h, --help` | boolean | Show help for the current command. |
 
 ## Resource commands

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -138,9 +139,35 @@ func (c *Client) StopTask(ctx context.Context, cluster, taskARN, reason string) 
 	return err
 }
 
+var globalDebug atomic.Bool
+
+// SetDebug enables or disables global AWS client verbose wire logging.
+func SetDebug(enabled bool) {
+	globalDebug.Store(enabled)
+}
+
+// ClientOption configures a Client during creation.
+type ClientOption func(*clientOptions)
+
+type clientOptions struct {
+	debug *bool
+}
+
+// WithDebug explicitly enables or disables verbose AWS SDK wire logging for a client instance.
+func WithDebug(enabled bool) ClientOption {
+	return func(o *clientOptions) {
+		o.debug = &enabled
+	}
+}
+
 // NewECSClient creates a new AWS client using the given region and profile.
 // If region or profile are empty, the SDK falls back to env vars / shared config.
-func NewECSClient(ctx context.Context, region, profile string) (*Client, error) {
+func NewECSClient(ctx context.Context, region, profile string, optFns ...ClientOption) (*Client, error) {
+	var clientOpts clientOptions
+	for _, fn := range optFns {
+		fn(&clientOpts)
+	}
+
 	var opts []func(*config.LoadOptions) error
 
 	if region != "" {
@@ -148,6 +175,14 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 	}
 	if profile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(profile))
+	}
+
+	isDebug := globalDebug.Load() || os.Getenv("ECSCTL_DEBUG") == "1" || strings.EqualFold(os.Getenv("ECSCTL_DEBUG"), "true")
+	if clientOpts.debug != nil {
+		isDebug = *clientOpts.debug
+	}
+	if isDebug {
+		opts = append(opts, config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries))
 	}
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)

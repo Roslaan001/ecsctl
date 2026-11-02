@@ -109,3 +109,20 @@ Specify a particular container and command to run:
 ```bash
 ecsctl exec my-service --cluster my-cluster --container web-app --command "python manage.py migrate"
 ```
+
+---
+
+## 🔍 Verbose Debug Logging (`--debug`)
+
+To diagnose AWS SDK errors, permission denials, signing issues, or HTTP timeouts, pass `--debug` to any `ecsctl` command or set `ECSCTL_DEBUG=true`:
+
+```bash
+# Print full HTTP request & response wire logging (headers, body, retries)
+ecsctl describe service my-service --cluster my-cluster --debug
+
+# Declarative apply with debug logging
+ecsctl apply -f service.yaml --debug
+```
+
+This streams the raw AWS wire traffic and request IDs to `stderr`, making it easy to isolate API issues and file AWS support requests.
+
