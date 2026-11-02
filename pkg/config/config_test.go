@@ -241,3 +241,32 @@ func TestLoadExpressServiceConfig_RequiresExactlyOneImageOrTaskDefinition(t *tes
 		}
 	}
 }
+
+func TestDetectResourceType(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{"cluster", "name: my-cluster\nregion: us-east-1\n", "cluster"},
+		{"service", "name: my-service\ncluster: my-cluster\n", "service"},
+		{"express-service", "serviceName: my-express\ninfrastructureRoleArn: arn:aws:iam::123:role/role\n", "express-service"},
+		{"gateway-deletionProtection", "name: my-gw\ndeletionProtection: true\n", "gateway"},
+		{"gateway-clusters", "name: my-gw\nclusters:\n  - c1\n", "gateway"},
+		{"gateway-kind", "name: my-gw\nkind: gateway\n", "gateway"},
+		{"gateway-configuration", "name: my-gw\nconfiguration:\n  hostSharedAlb:\n    scheme: internal\n", "gateway"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTemp(t, tt.content)
+			res, err := DetectResourceType(path)
+			if err != nil {
+				t.Fatalf("unexpected error detecting resource type: %v", err)
+			}
+			if res != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, res)
+			}
+		})
+	}
+}

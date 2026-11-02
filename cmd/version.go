@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -62,7 +63,8 @@ func checkLatestVersion(cmd *cobra.Command) (runErr error) {
 	var release struct {
 		TagName string `json:"tag_name"`
 	}
-	if err := json.NewDecoder(response.Body).Decode(&release); err != nil {
+	limitedBody := io.LimitReader(response.Body, 1<<20) // 1 MiB limit
+	if err := json.NewDecoder(limitedBody).Decode(&release); err != nil {
 		return fmt.Errorf("reading latest ecsctl release: %w", err)
 	}
 	if release.TagName == "" {
