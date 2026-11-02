@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"gopkg.in/yaml.v3"
@@ -57,6 +58,16 @@ type ecsIface interface {
 	StopTask(ctx context.Context, params *ecs.StopTaskInput, optFns ...func(*ecs.Options)) (*ecs.StopTaskOutput, error)
 	TagResource(ctx context.Context, params *ecs.TagResourceInput, optFns ...func(*ecs.Options)) (*ecs.TagResourceOutput, error)
 	UntagResource(ctx context.Context, params *ecs.UntagResourceInput, optFns ...func(*ecs.Options)) (*ecs.UntagResourceOutput, error)
+	CreateGateway(ctx context.Context, params *ecs.CreateGatewayInput, optFns ...func(*ecs.Options)) (*ecs.CreateGatewayOutput, error)
+	DescribeGateway(ctx context.Context, params *ecs.DescribeGatewayInput, optFns ...func(*ecs.Options)) (*ecs.DescribeGatewayOutput, error)
+	DeleteGateway(ctx context.Context, params *ecs.DeleteGatewayInput, optFns ...func(*ecs.Options)) (*ecs.DeleteGatewayOutput, error)
+	ListGateways(ctx context.Context, params *ecs.ListGatewaysInput, optFns ...func(*ecs.Options)) (*ecs.ListGatewaysOutput, error)
+	AssociateGatewayWithCluster(ctx context.Context, params *ecs.AssociateGatewayWithClusterInput, optFns ...func(*ecs.Options)) (*ecs.AssociateGatewayWithClusterOutput, error)
+	DisassociateGatewayFromCluster(ctx context.Context, params *ecs.DisassociateGatewayFromClusterInput, optFns ...func(*ecs.Options)) (*ecs.DisassociateGatewayFromClusterOutput, error)
+	ListGatewayClusterAssociations(ctx context.Context, params *ecs.ListGatewayClusterAssociationsInput, optFns ...func(*ecs.Options)) (*ecs.ListGatewayClusterAssociationsOutput, error)
+	DescribeGatewayResources(ctx context.Context, params *ecs.DescribeGatewayResourcesInput, optFns ...func(*ecs.Options)) (*ecs.DescribeGatewayResourcesOutput, error)
+	ListGatewayRoutes(ctx context.Context, params *ecs.ListGatewayRoutesInput, optFns ...func(*ecs.Options)) (*ecs.ListGatewayRoutesOutput, error)
+	DescribeGatewayRoute(ctx context.Context, params *ecs.DescribeGatewayRouteInput, optFns ...func(*ecs.Options)) (*ecs.DescribeGatewayRouteOutput, error)
 }
 
 type applicationAutoScalingIface interface {
@@ -75,6 +86,7 @@ type Client struct {
 	awsScaling  *autoscaling.Client
 	iam         *iam.Client
 	ssm         *ssm.Client
+	sts         *sts.Client
 	region      string
 }
 
@@ -163,6 +175,7 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 		awsScaling:  autoscaling.NewFromConfig(cfg),
 		iam:         iam.NewFromConfig(cfg),
 		ssm:         ssm.NewFromConfig(cfg),
+		sts:         sts.NewFromConfig(cfg),
 		region:      cfg.Region,
 	}, nil
 }
@@ -508,6 +521,9 @@ func (c *Client) CreateService(ctx context.Context, cfg *ecscfg.ServiceConfig) e
 	if cfg.ServiceConnect != nil {
 		input.ServiceConnectConfiguration = toServiceConnect(cfg.ServiceConnect)
 	}
+	if cfg.GatewayConnector != nil {
+		input.GatewayConnectors = toGatewayConnectors(cfg.GatewayConnector)
+	}
 
 	if cfg.NetworkConfig != nil {
 		input.NetworkConfiguration = &types.NetworkConfiguration{
@@ -654,6 +670,38 @@ func toServiceConnect(cfg *ecscfg.ServiceConnectConfig) *types.ServiceConnectCon
 		out.Services = append(out.Services, svc)
 	}
 	return out
+}
+
+func toGatewayConnectors(cfg *ecscfg.GatewayConnectorConfig) []types.GatewayConnector {
+	if cfg == nil || cfg.PortName == "" {
+		return nil
+	}
+	gc := types.GatewayConnector{
+		PortName: aws.String(cfg.PortName),
+	}
+	if cfg.HealthCheck != nil {
+		hc := &types.GatewayConnectorHealthCheck{}
+		if cfg.HealthCheck.Path != "" {
+			hc.HealthCheckPath = aws.String(cfg.HealthCheck.Path)
+		}
+		if cfg.HealthCheck.Protocol != "" {
+			hc.HealthCheckProtocol = types.GatewayConnectorHealthCheckProtocol(cfg.HealthCheck.Protocol)
+		}
+		if cfg.HealthCheck.IntervalSeconds > 0 {
+			hc.HealthCheckIntervalSeconds = aws.Int32(cfg.HealthCheck.IntervalSeconds)
+		}
+		if cfg.HealthCheck.TimeoutSeconds > 0 {
+			hc.HealthCheckTimeoutSeconds = aws.Int32(cfg.HealthCheck.TimeoutSeconds)
+		}
+		if cfg.HealthCheck.HealthyThresholdCount > 0 {
+			hc.HealthyThresholdCount = aws.Int32(cfg.HealthCheck.HealthyThresholdCount)
+		}
+		if cfg.HealthCheck.UnhealthyThresholdCount > 0 {
+			hc.UnhealthyThresholdCount = aws.Int32(cfg.HealthCheck.UnhealthyThresholdCount)
+		}
+		gc.HealthCheck = hc
+	}
+	return []types.GatewayConnector{gc}
 }
 
 // DeleteService drains and deletes an ECS service.

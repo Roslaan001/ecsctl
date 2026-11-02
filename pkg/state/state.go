@@ -37,6 +37,7 @@ const (
 	ResourceTypeCluster        ResourceType = "cluster"
 	ResourceTypeService        ResourceType = "service"
 	ResourceTypeExpressService ResourceType = "express-service"
+	ResourceTypeGateway        ResourceType = "gateway"
 )
 
 // Resource is a single ECS resource tracked in state.
@@ -412,6 +413,17 @@ func (st *State) FindServices(cluster string) []Resource {
 			if cluster == "" || r.Cluster == cluster {
 				result = append(result, r)
 			}
+		}
+	}
+	return result
+}
+
+// FindGateways returns all gateway resources in state.
+func (st *State) FindGateways() []Resource {
+	var result []Resource
+	for _, r := range st.Resources {
+		if r.Type == ResourceTypeGateway {
+			result = append(result, r)
 		}
 	}
 	return result

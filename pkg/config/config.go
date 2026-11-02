@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -184,6 +185,7 @@ type ServiceConfig struct {
 	PlacementStrategy             []PlacementStrategyConfig        `yaml:"placementStrategy"`
 	ServiceConnect                *ServiceConnectConfig            `yaml:"serviceConnect"`
 	AutoScaling                   *ServiceAutoScalingConfig        `yaml:"autoScaling"`
+	GatewayConnector              *GatewayConnectorConfig          `yaml:"gatewayConnector"`
 }
 
 // MarshalYAML preserves the distinction between omitted settings and explicit
@@ -235,6 +237,18 @@ func DetectResourceType(path string) (string, error) {
 	}
 	if _, ok := raw["cluster"]; ok {
 		return "service", nil
+	}
+	if _, ok := raw["infrastructureRoleArn"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["configuration"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["clusters"]; ok {
+		return "gateway", nil
+	}
+	if kind, ok := raw["kind"].(string); ok && strings.EqualFold(kind, "gateway") {
+		return "gateway", nil
 	}
 	if _, ok := raw["name"]; ok {
 		return "cluster", nil
@@ -368,6 +382,75 @@ func LoadExpressServiceConfig(path string) (*ExpressServiceConfig, error) {
 	}
 	if cfg.ScalingMetric != "" && cfg.ScalingMetric != "AVERAGE_CPU" && cfg.ScalingMetric != "AVERAGE_MEMORY" && cfg.ScalingMetric != "REQUEST_COUNT_PER_TARGET" {
 		return nil, fmt.Errorf("config file %q: scalingMetric must be AVERAGE_CPU, AVERAGE_MEMORY, or REQUEST_COUNT_PER_TARGET", path)
+	}
+	return &cfg, nil
+}
+
+// GatewayConnectorConfig configures an ECS service connector to attach to a cluster's gateway.
+type GatewayConnectorConfig struct {
+	PortName    string                             `yaml:"portName"`
+	HealthCheck *GatewayConnectorHealthCheckConfig `yaml:"healthCheck"`
+}
+
+// GatewayConnectorHealthCheckConfig configures custom health checks for a service gateway connector.
+type GatewayConnectorHealthCheckConfig struct {
+	Path                    string `yaml:"path"`
+	Protocol                string `yaml:"protocol"` // HTTP or HTTPS
+	IntervalSeconds         int32  `yaml:"intervalSeconds"`
+	TimeoutSeconds          int32  `yaml:"timeoutSeconds"`
+	HealthyThresholdCount   int32  `yaml:"healthyThresholdCount"`
+	UnhealthyThresholdCount int32  `yaml:"unhealthyThresholdCount"`
+}
+
+// GatewayConfig represents the configuration for an Amazon ECS Gateway.
+type GatewayConfig struct {
+	Name                  string                      `yaml:"name"`
+	InfrastructureRoleARN string                      `yaml:"infrastructureRoleArn"`
+	DeletionProtection    *bool                       `yaml:"deletionProtection"`
+	Configuration         *GatewayConfigurationConfig `yaml:"configuration"`
+	Clusters              []string                    `yaml:"clusters"`
+	Tags                  map[string]string           `yaml:"tags"`
+}
+
+// GatewayConfigurationConfig holds type-specific gateway configuration variants.
+type GatewayConfigurationConfig struct {
+	HostSharedAlb *HostSharedAlbConfig `yaml:"hostSharedAlb"`
+}
+
+// HostSharedAlbConfig configures a host-based shared Application Load Balancer gateway.
+type HostSharedAlbConfig struct {
+	Scheme      string                   `yaml:"scheme"` // internet-facing or internal
+	Network     *GatewayNetworkConfig    `yaml:"network"`
+	MaxAlbCount int32                    `yaml:"maxAlbCount"`
+	WebACLArn   string                   `yaml:"webACLArn"`
+	AccessLogs  *GatewayAccessLogsConfig `yaml:"accessLogs"`
+}
+
+// GatewayNetworkConfig specifies network settings for gateway load balancers.
+type GatewayNetworkConfig struct {
+	Subnets              []string `yaml:"subnets"`
+	InboundSecurityGroup string   `yaml:"inboundSecurityGroup"`
+	IPAddressType        string   `yaml:"ipAddressType"` // ipv4 or dualstack
+}
+
+// GatewayAccessLogsConfig defines access logging settings for gateway load balancers.
+type GatewayAccessLogsConfig struct {
+	S3BucketName string `yaml:"s3BucketName"`
+	S3Prefix     string `yaml:"s3Prefix"`
+}
+
+// LoadGatewayConfig reads and parses a gateway YAML config file.
+func LoadGatewayConfig(path string) (*GatewayConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config file %q: %w", path, err)
+	}
+	var cfg GatewayConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
+	}
+	if cfg.Name == "" {
+		return nil, fmt.Errorf("config file %q: 'name' is required", path)
 	}
 	return &cfg, nil
 }

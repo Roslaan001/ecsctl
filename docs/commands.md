@@ -92,6 +92,9 @@ Open an interactive bash/sh session or execute a single command inside a running
 > [!IMPORTANT]
 > To use this command, install the AWS Session Manager Plugin locally and make sure ECS Exec is enabled for the task. Your AWS identity and the task's IAM role also need the permissions required by ECS Exec. See [AWS ECS Exec prerequisites](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html).
 
+> [!NOTE]
+> **Audit Logging for Compliance**: In production and regulated environments, you can audit commands and session output executed via ECS Exec by enabling CloudWatch Logs or Amazon S3 encryption and logging in your ECS cluster's `executeCommandConfiguration`.
+
 ```bash
 ecsctl exec <service-name> --cluster <cluster-name> [flags]
 ```
@@ -109,3 +112,32 @@ Specify a particular container and command to run:
 ```bash
 ecsctl exec my-service --cluster my-cluster --container web-app --command "python manage.py migrate"
 ```
+
+---
+
+## 🌐 Amazon ECS Gateways (`gateway`)
+
+Manage account-level Amazon ECS Gateways, link clusters, and inspect managed ingress routes:
+
+```bash
+# Create a gateway
+ecsctl gateway create -f gateway.yaml
+
+# Link gateway to an ECS cluster
+ecsctl gateway associate --gateway my-gateway --cluster prod-cluster
+
+# Unlink gateway from an ECS cluster
+ecsctl gateway disassociate --gateway my-gateway --cluster prod-cluster
+
+# List gateways
+ecsctl gateway list
+
+# Inspect gateway and auto-provisioned ALBs/routes
+ecsctl gateway describe my-gateway --resources
+
+# Delete a gateway
+ecsctl gateway delete my-gateway
+```
+
+See [Amazon ECS Gateway Guide](gateway.md) for full configuration details.
+

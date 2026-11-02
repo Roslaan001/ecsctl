@@ -241,3 +241,122 @@ func TestLoadExpressServiceConfig_RequiresExactlyOneImageOrTaskDefinition(t *tes
 		}
 	}
 }
+
+func TestLoadGatewayConfig(t *testing.T) {
+	yaml := `name: my-gateway
+infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
+deletionProtection: true
+clusters:
+  - prod-cluster
+configuration:
+  hostSharedAlb:
+    scheme: internet-facing
+    maxAlbCount: 5
+    network:
+      subnets:
+        - subnet-12345
+      inboundSecurityGroup: sg-12345
+      ipAddressType: dualstack
+tags:
+  Environment: Production
+`
+	path := writeTemp(t, yaml)
+	cfg, err := LoadGatewayConfig(path)
+	if err != nil {
+		t.Fatalf("LoadGatewayConfig failed: %v", err)
+	}
+	if cfg.Name != "my-gateway" {
+		t.Errorf("expected name 'my-gateway', got %q", cfg.Name)
+	}
+	if cfg.InfrastructureRoleARN != "arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways" {
+		t.Errorf("unexpected infra role arn: %q", cfg.InfrastructureRoleARN)
+	}
+	if cfg.DeletionProtection == nil || !*cfg.DeletionProtection {
+		t.Errorf("expected deletionProtection true")
+	}
+	if len(cfg.Clusters) != 1 || cfg.Clusters[0] != "prod-cluster" {
+		t.Errorf("unexpected clusters: %v", cfg.Clusters)
+	}
+	if cfg.Configuration == nil || cfg.Configuration.HostSharedAlb == nil {
+		t.Fatalf("expected HostSharedAlb config")
+	}
+	if cfg.Configuration.HostSharedAlb.Scheme != "internet-facing" {
+		t.Errorf("expected scheme 'internet-facing', got %q", cfg.Configuration.HostSharedAlb.Scheme)
+	}
+}
+
+func TestLoadGatewayConfig_OptionalRole(t *testing.T) {
+	yaml := `name: my-gateway
+clusters:
+  - prod-cluster
+`
+	path := writeTemp(t, yaml)
+	cfg, err := LoadGatewayConfig(path)
+	if err != nil {
+		t.Fatalf("LoadGatewayConfig failed: %v", err)
+	}
+	if cfg.Name != "my-gateway" {
+		t.Errorf("expected name 'my-gateway', got %q", cfg.Name)
+	}
+	if cfg.InfrastructureRoleARN != "" {
+		t.Errorf("expected empty infra role ARN, got %q", cfg.InfrastructureRoleARN)
+	}
+}
+
+func TestDetectResourceType_Gateway(t *testing.T) {
+	yaml := `name: my-gateway
+infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
+`
+	path := writeTemp(t, yaml)
+	resType, err := DetectResourceType(path)
+	if err != nil {
+		t.Fatalf("DetectResourceType failed: %v", err)
+	}
+	if resType != "gateway" {
+		t.Errorf("expected 'gateway', got %q", resType)
+	}
+
+	yamlWithoutRole := `name: my-gateway
+configuration:
+  hostSharedAlb:
+    scheme: internet-facing
+`
+	path2 := writeTemp(t, yamlWithoutRole)
+	resType2, err := DetectResourceType(path2)
+	if err != nil {
+		t.Fatalf("DetectResourceType without role failed: %v", err)
+	}
+	if resType2 != "gateway" {
+		t.Errorf("expected 'gateway', got %q", resType2)
+	}
+}
+
+func TestLoadServiceConfig_GatewayConnector(t *testing.T) {
+	yaml := `name: web
+cluster: prod
+taskDefinition: web:1
+gatewayConnector:
+  portName: http
+  healthCheck:
+    path: /healthz
+    protocol: HTTP
+    intervalSeconds: 15
+    timeoutSeconds: 5
+    healthyThresholdCount: 2
+    unhealthyThresholdCount: 3
+`
+	path := writeTemp(t, yaml)
+	cfg, err := LoadServiceConfig(path)
+	if err != nil {
+		t.Fatalf("LoadServiceConfig failed: %v", err)
+	}
+	if cfg.GatewayConnector == nil {
+		t.Fatalf("expected GatewayConnector to be loaded")
+	}
+	if cfg.GatewayConnector.PortName != "http" {
+		t.Errorf("expected portName 'http', got %q", cfg.GatewayConnector.PortName)
+	}
+	if cfg.GatewayConnector.HealthCheck == nil || cfg.GatewayConnector.HealthCheck.Path != "/healthz" {
+		t.Errorf("unexpected health check config: %+v", cfg.GatewayConnector.HealthCheck)
+	}
+}

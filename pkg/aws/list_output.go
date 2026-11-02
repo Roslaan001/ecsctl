@@ -48,6 +48,15 @@ func ServiceListColumns(wide bool) []ListColumn {
 	return columns
 }
 
+// GatewayListColumns returns the column layout used for gateway list output.
+func GatewayListColumns(wide bool) []ListColumn {
+	columns := []ListColumn{{"name", "NAME"}, {"status", "STATUS"}, {"createdAt", "CREATED AT"}, {"region", "REGION"}, {"createdBy", "TRACKED BY"}, {"trackedAt", "TRACKED AT"}}
+	if wide {
+		columns = append(columns, ListColumn{"arn", "ARN"})
+	}
+	return columns
+}
+
 // ListColumn describes a field displayed by a list command.
 type ListColumn struct {
 	Key   string

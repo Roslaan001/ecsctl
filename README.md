@@ -147,6 +147,26 @@ ecsctl express describe --service-arn "$SERVICE_ARN"
 
 See the [Express Mode guide](docs/express.md) for the role requirements and YAML fields.
 
+### Amazon ECS Gateways
+
+Manage managed ingress, shared Application Load Balancers, and host-based routing:
+
+```bash
+# Create a gateway
+ecsctl create gateway -f gateway.yaml
+
+# Create a service with a gateway connector
+ecsctl create service --name api --cluster prod --task-definition api:1 --gateway-port http
+
+# Inspect gateway and underlying provisioned ALBs / service URLs
+ecsctl describe gateway my-gateway --resources
+
+# List gateways
+ecsctl list gateways
+```
+
+See the [Amazon ECS Gateway guide](docs/gateway.md) for architecture and configuration details.
+
 ### Task definitions and one-off tasks
 
 Register a task definition JSON file and run or stop standalone ECS tasks. Unless

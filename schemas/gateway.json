@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ECS Gateway Configuration",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "description": "Unique name for the ECS gateway." },
+    "infrastructureRoleArn": { "type": "string", "description": "IAM role ARN assumed by ECS to manage gateway infrastructure. If omitted, ecsctl automatically provisions 'ecsInfrastructureRoleForGateways' with the required AmazonECSInfrastructureRoleForGatewayHostSharedALB policy." },
+    "deletionProtection": { "type": "boolean", "default": true },
+    "clusters": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "ECS clusters to associate with this gateway."
+    },
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "hostSharedAlb": {
+          "type": "object",
+          "properties": {
+            "scheme": { "type": "string", "enum": ["internet-facing", "internal"], "default": "internet-facing" },
+            "maxAlbCount": { "type": "integer", "minimum": 1, "maximum": 50 },
+            "webACLArn": { "type": "string" },
+            "network": {
+              "type": "object",
+              "properties": {
+                "subnets": { "type": "array", "items": { "type": "string" } },
+                "inboundSecurityGroup": { "type": "string" },
+                "ipAddressType": { "type": "string", "enum": ["ipv4", "dualstack"] }
+              },
+              "additionalProperties": false
+            },
+            "accessLogs": {
+              "type": "object",
+              "properties": {
+                "s3BucketName": { "type": "string" },
+                "s3Prefix": { "type": "string" }
+              },
+              "required": ["s3BucketName"],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
