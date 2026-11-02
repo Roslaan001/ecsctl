@@ -38,10 +38,12 @@ jobs:
         run: |
           go test ./... -v -race -count=1 -coverprofile=coverage.out -covermode=atomic
           go tool cover -func=coverage.out | tee coverage.txt
-          echo "### Test & Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -n 1 coverage.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Test & Coverage Summary"
+            echo '```'
+            tail -n 1 coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify go.mod and go.sum are tidy
         run: |
