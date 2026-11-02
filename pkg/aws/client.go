@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 	"github.com/roslaan001/ecsctl/pkg/state"
 	"gopkg.in/yaml.v3"
@@ -85,6 +86,7 @@ type Client struct {
 	awsScaling  *autoscaling.Client
 	iam         *iam.Client
 	ssm         *ssm.Client
+	sts         *sts.Client
 	region      string
 }
 
@@ -173,6 +175,7 @@ func NewECSClient(ctx context.Context, region, profile string) (*Client, error) 
 		awsScaling:  autoscaling.NewFromConfig(cfg),
 		iam:         iam.NewFromConfig(cfg),
 		ssm:         ssm.NewFromConfig(cfg),
+		sts:         sts.NewFromConfig(cfg),
 		region:      cfg.Region,
 	}, nil
 }

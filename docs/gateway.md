@@ -27,12 +27,12 @@ Amazon ECS Gateways require an IAM infrastructure role that grants ECS permissio
 * **Trusted Service Entity**: `ecs.amazonaws.com`
 
 > [!TIP]
-> **Automatic Provisioning**: If `infrastructureRoleArn` or `--infra-role-arn` is omitted, `ecsctl` automatically checks for or creates the default role `ecsInfrastructureRoleForGateways` and attaches the required managed policy.
+> **Automatic Provisioning & Confused Deputy Protection**: If `infrastructureRoleArn` or `--infra-role-arn` is omitted, `ecsctl` automatically checks for or creates the default role `ecsInfrastructureRoleForGateways`, attaches the required managed policy, and adds the `aws:SourceAccount` condition to the trust policy to prevent the confused deputy problem.
 
 If your organization enforces strict IAM boundary policies or separate security roles, you can pre-create the role manually:
 
 ```bash
-# 1. Create the trust policy
+# 1. Create the trust policy (replace <account-id> with your 12-digit AWS account ID)
 cat << 'EOF' > trust-policy.json
 {
   "Version": "2012-10-17",
@@ -40,7 +40,12 @@ cat << 'EOF' > trust-policy.json
     {
       "Effect": "Allow",
       "Principal": { "Service": "ecs.amazonaws.com" },
-      "Action": "sts:AssumeRole"
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceAccount": "<account-id>"
+        }
+      }
     }
   ]
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 )
 
@@ -17,6 +18,16 @@ const (
 	ecsGatewayPolicy       = "arn:aws:iam::aws:policy/AmazonECSInfrastructureRoleForGatewayHostSharedALB"
 	ecsGatewayTrustPolicy  = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole"}]}`
 )
+
+// gatewayTrustPolicy generates an IAM assume role trust policy for the ECS Gateway
+// infrastructure role. When an account ID is available, it adds the aws:SourceAccount
+// condition to prevent the confused deputy problem per AWS security best practices.
+func gatewayTrustPolicy(accountID string) string {
+	if accountID == "" {
+		return ecsGatewayTrustPolicy
+	}
+	return fmt.Sprintf(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole","Condition":{"StringEquals":{"aws:SourceAccount":"%s"}}}]}`, accountID)
+}
 
 // EnsureGatewayInfrastructureRole ensures an IAM role for ECS Gateway exists and returns its ARN.
 // If roleArnOrName is empty, it checks for "ecsInfrastructureRoleForGateways".
@@ -56,9 +67,17 @@ func (c *Client) EnsureGatewayInfrastructureRole(ctx context.Context, roleArnOrN
 	}
 
 	fmt.Printf("Provisioning IAM role %q for ECS Gateway...\n", roleName)
+	var accountID string
+	if c.sts != nil {
+		callerOut, err := c.sts.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+		if err == nil && callerOut.Account != nil {
+			accountID = aws.ToString(callerOut.Account)
+		}
+	}
+
 	createOut, err := c.iam.CreateRole(ctx, &iam.CreateRoleInput{
 		RoleName:                 aws.String(roleName),
-		AssumeRolePolicyDocument: aws.String(ecsGatewayTrustPolicy),
+		AssumeRolePolicyDocument: aws.String(gatewayTrustPolicy(accountID)),
 		Description:              aws.String("ECS infrastructure role for gateways managed by ecsctl"),
 	})
 	if err != nil {

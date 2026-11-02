@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -204,5 +205,20 @@ func TestCreateService_WithGatewayConnector(t *testing.T) {
 	}
 	if gc.HealthCheck == nil || aws.ToString(gc.HealthCheck.HealthCheckPath) != "/healthz" {
 		t.Errorf("unexpected health check on gateway connector: %+v", gc.HealthCheck)
+	}
+}
+
+func TestGatewayTrustPolicy(t *testing.T) {
+	// Without account ID
+	p1 := gatewayTrustPolicy("")
+	if p1 != ecsGatewayTrustPolicy {
+		t.Errorf("expected default trust policy when account ID is empty, got %q", p1)
+	}
+
+	// With account ID (confused deputy prevention)
+	p2 := gatewayTrustPolicy("123456789012")
+	expectedCondition := `"Condition":{"StringEquals":{"aws:SourceAccount":"123456789012"}}`
+	if !strings.Contains(p2, expectedCondition) {
+		t.Errorf("expected trust policy to contain %q, got %q", expectedCondition, p2)
 	}
 }
