@@ -7,16 +7,17 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | Command | Purpose |
 |---|---|
 | `apply` | Create or update resources from YAML. |
-| `create` | Create a cluster or service. |
-| `delete` | Delete a cluster or service. |
-| `describe` | Show a cluster or service. |
-| `list` | List clusters, services, or tasks. |
+| `create` | Create a cluster, service, or gateway. |
+| `delete` | Delete a cluster, service, or gateway. |
+| `describe` | Show a cluster, service, task, or gateway. |
+| `list` | List clusters, services, tasks, task definitions, or gateways. |
 | `deploy` | Roll out a new service image. |
 | `rollback` | Restore the task definition from the previous completed service deployment. |
 | `scale` | Change a service's desired task count. |
 | `logs` | Read or follow service logs. |
 | `exec` | Open a shell or run a command in a task. |
 | `express` | Manage ECS Express Mode services. |
+| `gateway` | Manage Amazon ECS Gateways. |
 | `register task-definition` | Register a task definition from JSON. |
 | `run-task` / `stop-task` | Start or stop standalone tasks. |
 | `state` | Manage remote state and tracked resources. |
@@ -39,7 +40,7 @@ These flags can be used with any command or subcommand.
 
 ### `apply`
 
-Create a cluster, ECS service, or Express service from YAML, or update configured fields on an existing resource.
+Create a cluster, ECS service, Express service, or gateway from YAML, or update configured fields on an existing resource.
 
 ```text
 ecsctl apply -f FILE [--dry-run] [--wait]
@@ -127,7 +128,7 @@ Delete a resource by name.
 |---|---|
 | `ecsctl delete cluster NAME` | Optional `--force` to delete its services first; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
 | `ecsctl delete service NAME` | Required `--cluster CLUSTER`; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
-| `ecsctl delete gateway NAME` | Delete an Amazon ECS Gateway. |
+| `ecsctl delete gateway NAME` | Delete an Amazon ECS Gateway; `--dry-run` previews; `--yes` confirms non-interactive deletion. |
 
 ### `describe`
 
@@ -266,6 +267,19 @@ Manage ECS Express Mode services. See the [Express Mode guide](express.md) for d
 | `describe` | `ecsctl express describe --service-arn ARN` | Show service status. `--service-arn` is required. |
 | `delete` | `ecsctl express delete --service-arn ARN` | Begin managed service deletion. `--service-arn` is required. |
 | `list` | `ecsctl express list [--cluster NAME]` | List Express Mode services. `--cluster` defaults to the default cluster. |
+
+## Amazon ECS Gateway
+
+Manage Amazon ECS Gateways for managed ingress networking. See the [Gateway guide](gateway.md) for details.
+
+| Subcommand | Syntax | Description |
+|---|---|---|
+| `create` | `ecsctl gateway create -f FILE` | Create a gateway from YAML config or inline flags. |
+| `describe` | `ecsctl gateway describe NAME [--resources]` | Inspect gateway status and provisioned ALBs/routes. |
+| `list` | `ecsctl gateway list [--wide] [--state]` | List gateways in the region. |
+| `delete` | `ecsctl gateway delete NAME [--dry-run] [--yes]` | Delete a gateway. |
+| `associate` | `ecsctl gateway associate --gateway NAME --cluster CLUSTER` | Link a gateway to an ECS cluster. |
+| `disassociate` | `ecsctl gateway disassociate --gateway NAME --cluster CLUSTER` | Unlink a gateway from an ECS cluster. |
 
 ## Remote state
 
