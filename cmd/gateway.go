@@ -175,9 +175,11 @@ var deleteGatewayCmd = &cobra.Command{
 		}
 
 		if session != nil {
-			session.Update(func(st *state.State) {
+			if err := session.Update(func(st *state.State) {
 				st.RemoveResource(state.ResourceTypeGateway, nameOrArn, "")
-			})
+			}); err != nil {
+				return fmt.Errorf("updating remote state: %w", err)
+			}
 		}
 
 		fmt.Printf("✓ Gateway %q deleted.\n", nameOrArn)
@@ -288,8 +290,8 @@ var listGatewaysCmd = &cobra.Command{
 
 // associateGatewayCmd links a gateway to a cluster.
 var associateGatewayCmd = &cobra.Command{
-	Use:   "associate",
-	Short: "Associate an ECS Gateway with a cluster",
+	Use:     "associate",
+	Short:   "Associate an ECS Gateway with a cluster",
 	Example: `  ecsctl gateway associate --gateway my-gateway --cluster prod-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if assocGateway == "" {
@@ -313,8 +315,8 @@ var associateGatewayCmd = &cobra.Command{
 
 // disassociateGatewayCmd removes a cluster link from a gateway.
 var disassociateGatewayCmd = &cobra.Command{
-	Use:   "disassociate",
-	Short: "Disassociate an ECS Gateway from a cluster",
+	Use:     "disassociate",
+	Short:   "Disassociate an ECS Gateway from a cluster",
 	Example: `  ecsctl gateway disassociate --gateway my-gateway --cluster prod-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if assocGateway == "" {
@@ -384,7 +386,7 @@ func init() {
 	_ = disassociateGatewayCmd.MarkFlagRequired("gateway")
 	_ = disassociateGatewayCmd.MarkFlagRequired("cluster")
 
-// Register subcommands under create, describe, delete, list
+	// Register subcommands under create, describe, delete, list
 	createCmd.AddCommand(createGatewayCmd)
 	describeCmd.AddCommand(describeGatewayCmd)
 	deleteCmd.AddCommand(deleteGatewayCmd)

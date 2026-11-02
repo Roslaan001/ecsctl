@@ -328,4 +328,3 @@ gatewayConnector:
 		t.Errorf("unexpected health check config: %+v", cfg.GatewayConnector.HealthCheck)
 	}
 }
-

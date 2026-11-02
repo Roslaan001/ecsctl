@@ -378,7 +378,7 @@ func LoadExpressServiceConfig(path string) (*ExpressServiceConfig, error) {
 
 // GatewayConnectorConfig configures an ECS service connector to attach to a cluster's gateway.
 type GatewayConnectorConfig struct {
-	PortName    string                              `yaml:"portName"`
+	PortName    string                             `yaml:"portName"`
 	HealthCheck *GatewayConnectorHealthCheckConfig `yaml:"healthCheck"`
 }
 
