@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -240,6 +241,15 @@ func DetectResourceType(path string) (string, error) {
 	if _, ok := raw["infrastructureRoleArn"]; ok {
 		return "gateway", nil
 	}
+	if _, ok := raw["configuration"]; ok {
+		return "gateway", nil
+	}
+	if _, ok := raw["clusters"]; ok {
+		return "gateway", nil
+	}
+	if kind, ok := raw["kind"].(string); ok && strings.EqualFold(kind, "gateway") {
+		return "gateway", nil
+	}
 	if _, ok := raw["name"]; ok {
 		return "cluster", nil
 	}
@@ -441,9 +451,6 @@ func LoadGatewayConfig(path string) (*GatewayConfig, error) {
 	}
 	if cfg.Name == "" {
 		return nil, fmt.Errorf("config file %q: 'name' is required", path)
-	}
-	if cfg.InfrastructureRoleARN == "" {
-		return nil, fmt.Errorf("config file %q: 'infrastructureRoleArn' is required", path)
 	}
 	return &cfg, nil
 }

@@ -62,6 +62,35 @@ func TestCreateGateway(t *testing.T) {
 	}
 }
 
+func TestCreateGateway_AutoProvisionRole(t *testing.T) {
+	mock := &mockECS{
+		createGatewayOut: &ecs.CreateGatewayOutput{
+			GatewayArn: aws.String("arn:aws:ecs:us-east-1:123456789012:gateway/auto-role-gw"),
+			Name:       aws.String("auto-role-gw"),
+			Status:     types.GatewayStatusActive,
+		},
+	}
+	client := testClient(mock)
+
+	cfg := &ecscfg.GatewayConfig{
+		Name: "auto-role-gw",
+	}
+
+	arn, err := client.CreateGateway(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating gateway with auto role: %v", err)
+	}
+	if arn != "arn:aws:ecs:us-east-1:123456789012:gateway/auto-role-gw" {
+		t.Errorf("unexpected gateway ARN: %q", arn)
+	}
+	if mock.createGatewayIn == nil {
+		t.Fatalf("CreateGateway was not called on ECS client")
+	}
+	if aws.ToString(mock.createGatewayIn.InfrastructureRoleArn) != "arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways" {
+		t.Errorf("expected default role ARN, got %q", aws.ToString(mock.createGatewayIn.InfrastructureRoleArn))
+	}
+}
+
 func TestDescribeGateway(t *testing.T) {
 	mock := &mockECS{
 		describeGatewayOut: &ecs.DescribeGatewayOutput{

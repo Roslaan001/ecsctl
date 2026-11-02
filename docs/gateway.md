@@ -20,11 +20,49 @@ With **Amazon ECS Gateway**:
 
 ### 1. Create a Gateway
 
+#### IAM Infrastructure Role (Automatic or Custom)
+
+Amazon ECS Gateways require an IAM infrastructure role that grants ECS permission to provision and manage shared Application Load Balancers, target groups, and network interfaces on your behalf.
+* **AWS Managed Policy**: `arn:aws:iam::aws:policy/AmazonECSInfrastructureRoleForGatewayHostSharedALB`
+* **Trusted Service Entity**: `ecs.amazonaws.com`
+
+> [!TIP]
+> **Automatic Provisioning**: If `infrastructureRoleArn` or `--infra-role-arn` is omitted, `ecsctl` automatically checks for or creates the default role `ecsInfrastructureRoleForGateways` and attaches the required managed policy.
+
+If your organization enforces strict IAM boundary policies or separate security roles, you can pre-create the role manually:
+
+```bash
+# 1. Create the trust policy
+cat << 'EOF' > trust-policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "ecs.amazonaws.com" },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+# 2. Create the IAM role
+aws iam create-role \
+  --role-name ecsInfrastructureRoleForGateways \
+  --assume-role-policy-document file://trust-policy.json
+
+# 3. Attach the AWS managed policy
+aws iam attach-role-policy \
+  --role-name ecsInfrastructureRoleForGateways \
+  --policy-arn arn:aws:iam::aws:policy/AmazonECSInfrastructureRoleForGatewayHostSharedALB
+```
+
 #### Via YAML File (Recommended)
 Create `gateway.yaml`:
 ```yaml
 name: my-gateway
-infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
+# infrastructureRoleArn is optional; ecsctl auto-provisions ecsInfrastructureRoleForGateways if omitted:
+# infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
 deletionProtection: true
 clusters:
   - prod-cluster
@@ -52,9 +90,9 @@ ecsctl apply -f gateway.yaml
 
 #### Via Inline Flags
 ```bash
+# Infrastructure role is automatically created if --infra-role-arn is omitted
 ecsctl create gateway \
   --name my-gateway \
-  --infra-role-arn arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways \
   --subnets subnet-0123456789abcdef0,subnet-0fedcba9876543210 \
   --security-groups sg-0123456789abcdef0 \
   --clusters prod-cluster

@@ -46,9 +46,8 @@ var createGatewayCmd = &cobra.Command{
 	Example: `  # From a YAML file
   ecsctl create gateway -f gateway.yaml
 
-  # Inline flags
+  # Inline flags (role is auto-created if omitted)
   ecsctl create gateway --name my-gateway \
-    --infra-role-arn arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways \
     --subnets subnet-12345,subnet-67890 \
     --clusters prod-cluster`,
 	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
@@ -63,9 +62,6 @@ var createGatewayCmd = &cobra.Command{
 		} else {
 			if gatewayName == "" {
 				return fmt.Errorf("--name is required (or use -f to provide a config file)")
-			}
-			if gatewayInfraRole == "" {
-				return fmt.Errorf("--infra-role-arn is required")
 			}
 			scheme := gatewayScheme
 			if scheme == "" {
@@ -362,7 +358,7 @@ func init() {
 	// Flags for create gateway
 	createGatewayCmd.Flags().StringVarP(&gatewayFile, "file", "f", "", "Path to gateway config YAML")
 	createGatewayCmd.Flags().StringVar(&gatewayName, "name", "", "Gateway name")
-	createGatewayCmd.Flags().StringVar(&gatewayInfraRole, "infra-role-arn", "", "IAM infrastructure role ARN for gateway management")
+	createGatewayCmd.Flags().StringVar(&gatewayInfraRole, "infra-role-arn", "", "IAM infrastructure role ARN for gateway management (auto-created if omitted)")
 	createGatewayCmd.Flags().StringVar(&gatewayScheme, "scheme", "internet-facing", "Load balancer scheme: internet-facing or internal")
 	createGatewayCmd.Flags().StringSliceVar(&gatewaySubnets, "subnets", nil, "Subnet IDs for managed load balancers (comma-separated)")
 	createGatewayCmd.Flags().StringSliceVar(&gatewaySecurityGroups, "security-groups", nil, "Inbound security group IDs (comma-separated)")

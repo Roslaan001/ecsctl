@@ -102,14 +102,14 @@ ecsctl create service --name NAME --cluster CLUSTER --task-definition FAMILY:REV
 
 ```text
 ecsctl create gateway -f FILE
-ecsctl create gateway --name NAME --infra-role-arn ARN [--scheme internet-facing|internal] [--subnets LIST] [--security-groups LIST] [--clusters LIST]
+ecsctl create gateway --name NAME [--infra-role-arn ARN] [--scheme internet-facing|internal] [--subnets LIST] [--security-groups LIST] [--clusters LIST]
 ```
 
 | Flag | Type | Description |
 |---|---|---|
 | `-f, --file` | string | YAML configuration file. |
 | `--name` | string | Gateway name. Required when `-f` is omitted. |
-| `--infra-role-arn` | string | IAM infrastructure role ARN for gateway management. Required when `-f` is omitted. |
+| `--infra-role-arn` | string | IAM infrastructure role ARN for gateway management. If omitted, `ecsctl` auto-provisions `ecsInfrastructureRoleForGateways` with the required managed policy. |
 | `--scheme` | string | Load balancer scheme: `internet-facing` (default) or `internal`. |
 | `--subnets` | string slice | Subnet IDs for managed load balancers. |
 | `--security-groups` | string slice | Inbound security group IDs. |

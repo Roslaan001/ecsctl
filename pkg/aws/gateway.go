@@ -8,11 +8,83 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 )
 
+const (
+	defaultGatewayRoleName = "ecsInfrastructureRoleForGateways"
+	ecsGatewayPolicy       = "arn:aws:iam::aws:policy/AmazonECSInfrastructureRoleForGatewayHostSharedALB"
+	ecsGatewayTrustPolicy  = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole"}]}`
+)
+
+// EnsureGatewayInfrastructureRole ensures an IAM role for ECS Gateway exists and returns its ARN.
+// If roleArnOrName is empty, it checks for "ecsInfrastructureRoleForGateways".
+// If the role does not exist, it automatically creates it with the trusted ECS entity and
+// attaches the AmazonECSInfrastructureRoleForGatewayHostSharedALB policy.
+func (c *Client) EnsureGatewayInfrastructureRole(ctx context.Context, roleArnOrName string) (string, error) {
+	if roleArnOrName != "" && strings.HasPrefix(roleArnOrName, "arn:aws:iam::") && !strings.HasSuffix(roleArnOrName, "/"+defaultGatewayRoleName) {
+		return roleArnOrName, nil
+	}
+	if c.iam == nil {
+		if roleArnOrName != "" {
+			return roleArnOrName, nil
+		}
+		return "arn:aws:iam::123456789012:role/" + defaultGatewayRoleName, nil
+	}
+
+	roleName := roleArnOrName
+	if roleName == "" {
+		roleName = defaultGatewayRoleName
+	} else if strings.HasPrefix(roleName, "arn:aws:iam::") {
+		parts := strings.Split(roleName, "/")
+		roleName = parts[len(parts)-1]
+	}
+
+	getOut, err := c.iam.GetRole(ctx, &iam.GetRoleInput{
+		RoleName: aws.String(roleName),
+	})
+	if err == nil && getOut.Role != nil {
+		_, _ = c.iam.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+			RoleName:  aws.String(roleName),
+			PolicyArn: aws.String(ecsGatewayPolicy),
+		})
+		return aws.ToString(getOut.Role.Arn), nil
+	}
+	if err != nil && !isIAMMissing(err) {
+		return "", fmt.Errorf("checking IAM role %q: %w", roleName, err)
+	}
+
+	fmt.Printf("Provisioning IAM role %q for ECS Gateway...\n", roleName)
+	createOut, err := c.iam.CreateRole(ctx, &iam.CreateRoleInput{
+		RoleName:                 aws.String(roleName),
+		AssumeRolePolicyDocument: aws.String(ecsGatewayTrustPolicy),
+		Description:              aws.String("ECS infrastructure role for gateways managed by ecsctl"),
+	})
+	if err != nil {
+		return "", fmt.Errorf("creating gateway infrastructure role %q: %w", roleName, err)
+	}
+
+	if _, err := c.iam.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+		RoleName:  aws.String(roleName),
+		PolicyArn: aws.String(ecsGatewayPolicy),
+	}); err != nil {
+		return "", fmt.Errorf("attaching gateway policy to role %q: %w", roleName, err)
+	}
+
+	return aws.ToString(createOut.Role.Arn), nil
+}
+
 // CreateGateway creates an ECS Gateway and associates it with any specified clusters.
 func (c *Client) CreateGateway(ctx context.Context, cfg *ecscfg.GatewayConfig) (string, error) {
+	if cfg.InfrastructureRoleARN == "" || strings.HasSuffix(cfg.InfrastructureRoleARN, "/"+defaultGatewayRoleName) || cfg.InfrastructureRoleARN == defaultGatewayRoleName {
+		roleArn, err := c.EnsureGatewayInfrastructureRole(ctx, cfg.InfrastructureRoleARN)
+		if err != nil {
+			return "", fmt.Errorf("ensuring gateway infrastructure role: %w", err)
+		}
+		cfg.InfrastructureRoleARN = roleArn
+	}
+
 	input := &ecs.CreateGatewayInput{
 		Name:                  aws.String(cfg.Name),
 		InfrastructureRoleArn: aws.String(cfg.InfrastructureRoleARN),

@@ -2,10 +2,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ECS Gateway Configuration",
   "type": "object",
-  "required": ["name", "infrastructureRoleArn"],
+  "required": ["name"],
   "properties": {
     "name": { "type": "string", "description": "Unique name for the ECS gateway." },
-    "infrastructureRoleArn": { "type": "string", "description": "IAM role ARN assumed by ECS to manage gateway infrastructure." },
+    "infrastructureRoleArn": { "type": "string", "description": "IAM role ARN assumed by ECS to manage gateway infrastructure. If omitted, ecsctl automatically provisions 'ecsInfrastructureRoleForGateways' with the required AmazonECSInfrastructureRoleForGatewayHostSharedALB policy." },
     "deletionProtection": { "type": "boolean", "default": true },
     "clusters": {
       "type": "array",

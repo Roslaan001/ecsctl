@@ -285,6 +285,24 @@ tags:
 	}
 }
 
+func TestLoadGatewayConfig_OptionalRole(t *testing.T) {
+	yaml := `name: my-gateway
+clusters:
+  - prod-cluster
+`
+	path := writeTemp(t, yaml)
+	cfg, err := LoadGatewayConfig(path)
+	if err != nil {
+		t.Fatalf("LoadGatewayConfig failed: %v", err)
+	}
+	if cfg.Name != "my-gateway" {
+		t.Errorf("expected name 'my-gateway', got %q", cfg.Name)
+	}
+	if cfg.InfrastructureRoleARN != "" {
+		t.Errorf("expected empty infra role ARN, got %q", cfg.InfrastructureRoleARN)
+	}
+}
+
 func TestDetectResourceType_Gateway(t *testing.T) {
 	yaml := `name: my-gateway
 infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
@@ -296,6 +314,20 @@ infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGa
 	}
 	if resType != "gateway" {
 		t.Errorf("expected 'gateway', got %q", resType)
+	}
+
+	yamlWithoutRole := `name: my-gateway
+configuration:
+  hostSharedAlb:
+    scheme: internet-facing
+`
+	path2 := writeTemp(t, yamlWithoutRole)
+	resType2, err := DetectResourceType(path2)
+	if err != nil {
+		t.Fatalf("DetectResourceType without role failed: %v", err)
+	}
+	if resType2 != "gateway" {
+		t.Errorf("expected 'gateway', got %q", resType2)
 	}
 }
 
