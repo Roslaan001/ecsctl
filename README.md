@@ -226,6 +226,24 @@ ecsctl exec my-service --cluster my-cluster --container web
 ecsctl exec my-service --cluster my-cluster --command "/bin/sh"
 ```
 
+### Port Forward
+
+Forward a local port to a container port in a running ECS task via AWS Systems Manager:
+
+```bash
+# Forward local port 8080 to container port 80
+ecsctl port-forward my-service 8080:80 --cluster my-cluster
+
+# Forward local port 8080 to container port 8080
+ecsctl port-forward my-service 8080 --cluster my-cluster
+
+# Forward to a specific container
+ecsctl port-forward my-service 5432:5432 --cluster my-cluster --container postgres
+
+# Forward directly to a specific task ID
+ecsctl port-forward 8080:80 --cluster my-cluster --task abc123def456
+```
+
 ---
 
 ## Inspection & Querying

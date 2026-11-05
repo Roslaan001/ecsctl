@@ -44,6 +44,12 @@ type mockECS struct {
 	runTaskErr          error
 	stopTaskInput       *ecs.StopTaskInput
 	stopTaskErr         error
+	listTasksIn         *ecs.ListTasksInput
+	listTasksOut        *ecs.ListTasksOutput
+	listTasksErr        error
+	describeTasksIn     *ecs.DescribeTasksInput
+	describeTasksOut    *ecs.DescribeTasksOutput
+	describeTasksErr    error
 	describeTaskDefOut  *ecs.DescribeTaskDefinitionOutput
 	registerTaskDefIn   *ecs.RegisterTaskDefinitionInput
 	registerTaskDefOut  *ecs.RegisterTaskDefinitionOutput
@@ -124,10 +130,18 @@ func (m *mockECS) RegisterTaskDefinition(_ context.Context, input *ecs.RegisterT
 	m.registerTaskDefIn = input
 	return m.registerTaskDefOut, nil
 }
-func (m *mockECS) DescribeTasks(_ context.Context, _ *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
+func (m *mockECS) DescribeTasks(_ context.Context, in *ecs.DescribeTasksInput, _ ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
+	m.describeTasksIn = in
+	if m.describeTasksOut != nil || m.describeTasksErr != nil {
+		return m.describeTasksOut, m.describeTasksErr
+	}
 	panic("unexpected: DescribeTasks")
 }
-func (m *mockECS) ListTasks(_ context.Context, _ *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+func (m *mockECS) ListTasks(_ context.Context, in *ecs.ListTasksInput, _ ...func(*ecs.Options)) (*ecs.ListTasksOutput, error) {
+	m.listTasksIn = in
+	if m.listTasksOut != nil || m.listTasksErr != nil {
+		return m.listTasksOut, m.listTasksErr
+	}
 	panic("unexpected: ListTasks")
 }
 func (m *mockECS) ExecuteCommand(_ context.Context, _ *ecs.ExecuteCommandInput, _ ...func(*ecs.Options)) (*ecs.ExecuteCommandOutput, error) {
