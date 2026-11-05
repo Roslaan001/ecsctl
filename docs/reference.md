@@ -16,6 +16,7 @@ Use this page to find a command, its common syntax, and the flags it accepts. Fo
 | `scale` | Change a service's desired task count. |
 | `logs` | Read or follow service logs. |
 | `exec` | Open a shell or run a command in a task. |
+| `port-forward` | Forward a local port to a container port in an ECS task. |
 | `express` | Manage ECS Express Mode services. |
 | `register task-definition` | Register a task definition from JSON. |
 | `run-task` / `stop-task` | Start or stop standalone tasks. |
@@ -201,6 +202,22 @@ ecsctl exec SERVICE --cluster CLUSTER [--container NAME] [--command COMMAND] [--
 | `--container` | string | Container name. |
 | `--command` | string | Command to run. Defaults to a shell. |
 | `--task` | string | Specific task to use. Otherwise, ecsctl selects a running task. |
+
+### `port-forward`
+
+Forward a local port to a container port in an ECS task container via AWS Systems Manager.
+
+```text
+ecsctl port-forward [SERVICE] [LOCAL_PORT:CONTAINER_PORT] --cluster CLUSTER [--container NAME] [--task TASK]
+```
+
+| Flag | Type | Description |
+|---|---|---|
+| `--cluster` | string | Target cluster. Required. |
+| `--container` | string | Container name. Defaults to the first container in the task. |
+| `--task` | string | Specific task ID or ARN. Otherwise, selects a running task from the service. |
+| `--local-port` | integer | Local port to listen on. |
+| `--container-port` | integer | Container port to forward traffic to. |
 
 ### Standalone tasks
 

@@ -109,3 +109,44 @@ Specify a particular container and command to run:
 ```bash
 ecsctl exec my-service --cluster my-cluster --container web-app --command "python manage.py migrate"
 ```
+
+---
+
+## 🔌 Port Forwarding (`port-forward`)
+
+Forward a local port to a container port in a running ECS task using AWS Systems Manager Session Manager. This allows you to securely access databases, APIs, or internal admin dashboards running inside private containers directly from your workstation without public IPs, open inbound security groups, or bastion hosts.
+
+> [!IMPORTANT]
+> Requires the AWS Session Manager Plugin installed locally, and ECS Exec enabled for the target task/service.
+
+```bash
+ecsctl port-forward <service-name> <local-port>:<container-port> --cluster <cluster-name> [flags]
+```
+
+### Forward to a Service
+Forward local port 8080 to container port 80 on a running task:
+
+```bash
+ecsctl port-forward my-service 8080:80 --cluster my-cluster
+```
+
+If local and container ports are the same:
+
+```bash
+ecsctl port-forward my-service 8080 --cluster my-cluster
+```
+
+### Specify a Container Name
+When a task definition contains multiple containers, select the target container with `--container`:
+
+```bash
+ecsctl port-forward my-service 5432:5432 --cluster my-cluster --container postgres
+```
+
+### Forward Directly to a Specific Task
+Forward traffic directly to an individual task ID without a service:
+
+```bash
+ecsctl port-forward 8080:80 --cluster my-cluster --task abc123def456
+```
+

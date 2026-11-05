@@ -66,6 +66,11 @@ type applicationAutoScalingIface interface {
 	DescribeScalingPolicies(ctx context.Context, params *applicationautoscaling.DescribeScalingPoliciesInput, optFns ...func(*applicationautoscaling.Options)) (*applicationautoscaling.DescribeScalingPoliciesOutput, error)
 }
 
+type ssmIface interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	StartSession(ctx context.Context, params *ssm.StartSessionInput, optFns ...func(*ssm.Options)) (*ssm.StartSessionOutput, error)
+}
+
 // Client wraps the AWS ECS and CloudWatch Logs SDK clients.
 type Client struct {
 	ecs         ecsIface
@@ -74,7 +79,7 @@ type Client struct {
 	ec2         *ec2.Client
 	awsScaling  *autoscaling.Client
 	iam         *iam.Client
-	ssm         *ssm.Client
+	ssm         ssmIface
 	region      string
 }
 
