@@ -29,7 +29,7 @@ type PortForwardOptions struct {
 
 type sessionPluginRunnerFunc func(ctx context.Context, pluginPath string, args []string) error
 
-var defaultSessionPluginRunner = func(ctx context.Context, pluginPath string, args []string) error {
+var defaultSessionPluginRunner sessionPluginRunnerFunc = func(ctx context.Context, pluginPath string, args []string) error {
 	cmd := exec.CommandContext(ctx, pluginPath, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -38,8 +38,8 @@ var defaultSessionPluginRunner = func(ctx context.Context, pluginPath string, ar
 }
 
 var (
-	sessionPluginRunner = defaultSessionPluginRunner
-	sessionLookPath     = exec.LookPath
+	sessionPluginRunner sessionPluginRunnerFunc = defaultSessionPluginRunner
+	sessionLookPath                             = exec.LookPath
 )
 
 // PortForward establishes a port-forwarding session from localPort to containerPort
