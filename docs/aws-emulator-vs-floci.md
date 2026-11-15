@@ -76,7 +76,8 @@ sequenceDiagram
 ```yaml
 - name: Setup AWS Emulator TLS CA
   run: |
-    docker cp aws-emulator:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /usr/local/share/ca-certificates/aws-emulator.crt
+    # The emulator writes its generated CA to its port-specific runtime directory
+    docker cp aws-emulator:/home/emulator/.aws/emulator/9297/ca.pem /usr/local/share/ca-certificates/aws-emulator.crt
     sudo update-ca-certificates
 ```
 
@@ -225,8 +226,9 @@ test-floci:
 	docker compose down
 
 test-aws-emulator:
-	docker compose -f docker-compose.aws-emulator.yml up -d
-	AWS_ENDPOINT_URL=https://localhost:9297 go test -v ./pkg/aws -run TestLocalEmulator
+	docker compose -f docker-compose.aws-emulator.yml up -d --build
+	docker compose -f docker-compose.aws-emulator.yml cp aws-emulator:/home/emulator/.aws/emulator/9297/ca.pem /tmp/ecsctl-aws-emulator-ca.pem
+	AWS_CA_BUNDLE=/tmp/ecsctl-aws-emulator-ca.pem AWS_ENDPOINT_URL=https://127.0.0.1:9297 go test -v ./pkg/aws -run TestLocalEmulator
 	docker compose -f docker-compose.aws-emulator.yml down
 
 test-emulators: test-floci test-aws-emulator
