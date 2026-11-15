@@ -53,7 +53,7 @@ test-aws-emulator:
 		if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
 			cleanup() { docker compose -f docker-compose.aws-emulator.yml down -v; rm -f /tmp/ecsctl-aws-emulator-ca.pem; }; \
 			trap cleanup EXIT; \
-			docker compose -f docker-compose.aws-emulator.yml up -d; \
+			docker compose -f docker-compose.aws-emulator.yml up -d --build; \
 			for i in $$(seq 1 30); do \
 				if docker compose -f docker-compose.aws-emulator.yml cp aws-emulator:/home/emulator/.aws/emulator/9297/ca.pem /tmp/ecsctl-aws-emulator-ca.pem >/dev/null 2>&1; then \
 					break; \
