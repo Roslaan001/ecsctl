@@ -67,6 +67,8 @@ var applyCmd = &cobra.Command{
 			return applyService(client, applyFile, session)
 		case "express-service":
 			return applyExpressService(client, applyFile, session)
+		case "gateway":
+			return applyGateway(client, applyFile, session, clientRegion)
 		default:
 			return fmt.Errorf("unknown resource kind %q in %s", resourceType, applyFile)
 		}
@@ -255,6 +257,42 @@ func applyExpressService(client *aws.Client, file string, session *stateSession)
 			return err
 		}
 		printExpressIngress(service)
+	}
+	return nil
+}
+
+func applyGateway(client *aws.Client, file string, session *stateSession, clientRegion string) error {
+	cfg, err := config.LoadGatewayConfig(file)
+	if err != nil {
+		return err
+	}
+
+	gw, err := client.DescribeGateway(context.Background(), cfg.Name)
+	if err == nil && gw != nil {
+		fmt.Printf("  Gateway %q is up to date (%s).\n", cfg.Name, awssdk.ToString(gw.GatewayArn))
+		if !applyDryRun && session != nil {
+			if err := recordGatewayState(session, client, cfg, awssdk.ToString(gw.GatewayArn), clientRegion); err != nil {
+				return fmt.Errorf("gateway state was not updated: %w", err)
+			}
+		}
+		return nil
+	}
+
+	if applyDryRun {
+		fmt.Printf("[dry-run] + Would create gateway %q.\n", cfg.Name)
+		return nil
+	}
+
+	fmt.Printf("Creating gateway %q...\n", cfg.Name)
+	arn, err := client.CreateGateway(context.Background(), cfg)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✓ Gateway %q created (%s).\n", cfg.Name, arn)
+	if session != nil {
+		if err := recordGatewayState(session, client, cfg, arn, clientRegion); err != nil {
+			return fmt.Errorf("gateway created but remote state was not updated: %w", err)
+		}
 	}
 	return nil
 }

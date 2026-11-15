@@ -144,6 +144,7 @@ var (
 	createServicePublicIP           string
 	createServiceTags               []string
 	createServiceWait               bool
+	createServiceGatewayPort        string
 )
 
 // create service
@@ -206,6 +207,12 @@ var createServiceCmd = &cobra.Command{
 					Subnets:        createServiceSubnets,
 					SecurityGroups: createServiceSecurityGroups,
 					AssignPublicIP: createServicePublicIP,
+				}
+			}
+
+			if createServiceGatewayPort != "" {
+				cfg.GatewayConnector = &config.GatewayConnectorConfig{
+					PortName: createServiceGatewayPort,
 				}
 			}
 		}
@@ -287,6 +294,7 @@ func init() {
 	createServiceCmd.Flags().StringVar(&createServicePublicIP, "assign-public-ip", "ENABLED", "Assign public IP: ENABLED or DISABLED")
 	createServiceCmd.Flags().StringArrayVar(&createServiceTags, "tags", nil, "Tags as key=value pairs (repeatable)")
 	createServiceCmd.Flags().BoolVar(&createServiceWait, "wait", false, "Wait for the service to reach steady state")
+	createServiceCmd.Flags().StringVar(&createServiceGatewayPort, "gateway-port", "", "Named container port to route ECS Gateway ingress traffic to")
 
 	createCmd.AddCommand(createClusterCmd)
 	createCmd.AddCommand(createServiceCmd)
@@ -424,6 +432,24 @@ func recordExpressState(s *stateSession, client *aws.Client, cfg *config.Express
 	createdBy, trackedAt := trackedResourceMetadata(s, state.ResourceTypeExpressService, cfg.ServiceName, cfg.Cluster, arn, region, time.Time{})
 	resource := &state.Resource{
 		Type: state.ResourceTypeExpressService, Name: cfg.ServiceName, ARN: arn, Cluster: cfg.Cluster,
+		Region: region, CreatedBy: createdBy, CreatedAt: trackedAt, Configuration: string(serialized),
+	}
+	return s.Update(func(st *state.State) {
+		st.AddResource(*resource)
+	})
+}
+
+func recordGatewayState(s *stateSession, client *aws.Client, cfg *config.GatewayConfig, arn, region string) error {
+	if region == "" && client != nil {
+		region = client.Region()
+	}
+	serialized, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("serializing Gateway config for remote state: %w", err)
+	}
+	createdBy, trackedAt := trackedResourceMetadata(s, state.ResourceTypeGateway, cfg.Name, "", arn, region, time.Time{})
+	resource := &state.Resource{
+		Type: state.ResourceTypeGateway, Name: cfg.Name, ARN: arn,
 		Region: region, CreatedBy: createdBy, CreatedAt: trackedAt, Configuration: string(serialized),
 	}
 	return s.Update(func(st *state.State) {

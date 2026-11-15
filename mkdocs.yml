@@ -49,6 +49,7 @@ nav:
   - Installation: installation.md
   - Uninstallation: uninstallation.md
   - Declarative Management: declarative.md
+  - Amazon ECS Gateway: gateway.md
   - ECS Express Mode: express.md
   - Operations & Commands: commands.md
   - Task Definitions and One-off Tasks: tasks.md

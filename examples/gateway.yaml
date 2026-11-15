@@ -1,0 +1,33 @@
+# ecsctl Sample Gateway Configuration
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/gateway.json
+# Usage:
+#   ecsctl apply -f gateway.yaml
+#   ecsctl delete gateway my-gateway
+
+name: my-gateway
+deletionProtection: true
+
+# Optional: IAM infrastructure role. If omitted, ecsctl automatically provisions
+# 'ecsInfrastructureRoleForGateways' with the required AWS-managed policy.
+# infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
+
+# ECS clusters to associate with this gateway
+clusters:
+  - my-cluster
+
+# Managed Application Load Balancer configuration
+configuration:
+  hostSharedAlb:
+    scheme: internet-facing
+    maxAlbCount: 5
+    network:
+      subnets:
+        - subnet-0bb123456789abcde
+        - subnet-0cc123456789abcde
+      inboundSecurityGroup: sg-0aa123456789abcde
+      ipAddressType: ipv4
+
+# Resource tags applied to the gateway
+tags:
+  env: production
+  team: platform
