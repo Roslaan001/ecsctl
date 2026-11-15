@@ -17,22 +17,31 @@ import (
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
 )
 
-// TestFlociECSServiceLifecycle exercises ecsctl's ECS client against a local
-// Floci endpoint. Set AWS_ENDPOINT_URL to the Floci endpoint to opt in.
+// TestLocalEmulatorECSServiceLifecycle exercises ecsctl's ECS client against a local
+// emulator endpoint (e.g. Floci or AWS Emulator). Set AWS_ENDPOINT_URL to opt in.
 // The test only creates local resources and uses dummy credentials.
+func TestLocalEmulatorECSServiceLifecycle(t *testing.T) {
+	testLocalEmulatorECSServiceLifecycle(t)
+}
+
+// TestFlociECSServiceLifecycle is preserved for backward compatibility.
 func TestFlociECSServiceLifecycle(t *testing.T) {
+	testLocalEmulatorECSServiceLifecycle(t)
+}
+
+func testLocalEmulatorECSServiceLifecycle(t *testing.T) {
 	endpoint := os.Getenv("AWS_ENDPOINT_URL")
 	if endpoint == "" {
-		t.Skip("set AWS_ENDPOINT_URL to run the Floci integration test")
+		t.Skip("set AWS_ENDPOINT_URL to run the emulator integration test")
 	}
 	parsedEndpoint, err := url.Parse(endpoint)
 	if err != nil || parsedEndpoint.Hostname() == "" {
-		t.Fatalf("invalid Floci endpoint %q", endpoint)
+		t.Fatalf("invalid emulator endpoint %q", endpoint)
 	}
 	host := parsedEndpoint.Hostname()
 	ip := net.ParseIP(host)
 	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-		t.Fatalf("Floci integration tests only allow a loopback endpoint, got %q", endpoint)
+		t.Fatalf("emulator integration tests only allow a loopback endpoint, got %q", endpoint)
 	}
 	t.Setenv("AWS_ENDPOINT_URL_ECS", endpoint)
 
@@ -62,7 +71,7 @@ func TestFlociECSServiceLifecycle(t *testing.T) {
 		}
 		select {
 		case <-ctx.Done():
-			t.Fatalf("Floci did not become ready: %v (last request error: %v)", ctx.Err(), err)
+			t.Fatalf("emulator did not become ready: %v (last request error: %v)", ctx.Err(), err)
 		case <-time.After(500 * time.Millisecond):
 		}
 	}
@@ -90,6 +99,7 @@ func TestFlociECSServiceLifecycle(t *testing.T) {
 			Name:      awssdk.String("app"),
 			Image:     awssdk.String("public.ecr.aws/docker/library/nginx:latest"),
 			Essential: awssdk.Bool(true),
+			Memory:    awssdk.Int32(256),
 		}},
 	})
 	if err != nil {

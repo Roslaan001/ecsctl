@@ -5,7 +5,7 @@ BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 BUILD_DIR  := ./bin
 LDFLAGS    := -ldflags "-X github.com/roslaan001/ecsctl/cmd.Version=$(VERSION) -X github.com/roslaan001/ecsctl/cmd.Commit=$(COMMIT) -X github.com/roslaan001/ecsctl/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build clean install tidy lint test test-floci docs-serve docs-build
+.PHONY: all build clean install tidy lint test test-floci test-aws-emulator test-emulators docs-serve docs-build
 
 all: build
 
@@ -46,6 +46,27 @@ test-floci:
 			echo 'Floci tests require Docker Compose or Podman' >&2; exit 1; \
 		fi; \
 		AWS_ENDPOINT_URL=http://127.0.0.1:4566 AWS_DEFAULT_REGION=us-east-1 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_EC2_METADATA_DISABLED=true go test -tags=integration ./pkg/aws -run '^TestFlociECSServiceLifecycle$$' -count=1 -v
+
+## test-aws-emulator: run ECS integration test against local AWS Emulator (requires Docker Compose)
+test-aws-emulator:
+	@set -eu; \
+		if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
+			cleanup() { docker compose -f docker-compose.aws-emulator.yml down -v; rm -f /tmp/ecsctl-aws-emulator-ca.pem; }; \
+			trap cleanup EXIT; \
+			docker compose -f docker-compose.aws-emulator.yml up -d; \
+			for i in $$(seq 1 30); do \
+				if docker compose -f docker-compose.aws-emulator.yml cp aws-emulator:/home/emulator/.aws/emulator/9297/ca.pem /tmp/ecsctl-aws-emulator-ca.pem >/dev/null 2>&1; then \
+					break; \
+				fi; \
+				sleep 0.5; \
+			done; \
+		else \
+			echo 'AWS Emulator tests require Docker Compose' >&2; exit 1; \
+		fi; \
+		AWS_CA_BUNDLE=/tmp/ecsctl-aws-emulator-ca.pem AWS_ENDPOINT_URL=https://127.0.0.1:9297 AWS_DEFAULT_REGION=us-east-1 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_EC2_METADATA_DISABLED=true go test -tags=integration ./pkg/aws -run '^TestFlociECSServiceLifecycle$$' -count=1 -v
+
+## test-emulators: run ECS integration test against both Floci and AWS Emulator
+test-emulators: test-floci test-aws-emulator
 
 ## clean: remove build artifacts
 clean:
