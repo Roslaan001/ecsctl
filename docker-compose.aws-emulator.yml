@@ -1,0 +1,9 @@
+services:
+  aws-emulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws-emulator
+    image: aws-emulator:local
+    ports:
+      - "127.0.0.1:9297:9297"
+    command: ["-b", "0.0.0.0", "-p", "9297", "-a", "off", "-t", "off"]

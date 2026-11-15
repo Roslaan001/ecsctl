@@ -201,6 +201,22 @@ jobs:
           AWS_EC2_METADATA_DISABLED: "true"
         run: go test -tags=integration ./pkg/aws -run '^TestFlociECSServiceLifecycle$' -count=1 -v
 
+  aws-emulator-integration:
+    name: AWS Emulator ECS integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Exercise ECS service lifecycle against AWS Emulator
+        run: make test-aws-emulator
+
   installer-smoke:
     name: Installer smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
