@@ -71,6 +71,13 @@ fi
 
 # Clean version tag (remove leading 'v' for filename construction, keep for download path)
 VERSION_CLEAN=${VERSION#v}
+
+# Validate version format (semver with optional leading 'v')
+if ! printf '%s\n' "$VERSION" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+    echo "Error: invalid version format '$VERSION'. Expected format: vX.Y.Z or X.Y.Z" >&2
+    exit 1
+fi
+
 echo "Selected version: $VERSION"
 
 # Format download URL
