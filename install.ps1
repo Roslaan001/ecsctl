@@ -51,6 +51,11 @@ if ([string]::IsNullOrEmpty($Version) -or $Version -eq "null") {
     Exit 1
 }
 
+if ($Version -notmatch '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$') {
+    Write-Error "Invalid version format '$Version'. Expected format: vX.Y.Z or X.Y.Z"
+    Exit 1
+}
+
 $VersionClean = $Version.TrimStart('v')
 Write-Host "Selected version: $Version"
 

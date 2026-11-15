@@ -303,34 +303,6 @@ clusters:
 	}
 }
 
-func TestDetectResourceType_Gateway(t *testing.T) {
-	yaml := `name: my-gateway
-infrastructureRoleArn: arn:aws:iam::123456789012:role/ecsInfrastructureRoleForGateways
-`
-	path := writeTemp(t, yaml)
-	resType, err := DetectResourceType(path)
-	if err != nil {
-		t.Fatalf("DetectResourceType failed: %v", err)
-	}
-	if resType != "gateway" {
-		t.Errorf("expected 'gateway', got %q", resType)
-	}
-
-	yamlWithoutRole := `name: my-gateway
-configuration:
-  hostSharedAlb:
-    scheme: internet-facing
-`
-	path2 := writeTemp(t, yamlWithoutRole)
-	resType2, err := DetectResourceType(path2)
-	if err != nil {
-		t.Fatalf("DetectResourceType without role failed: %v", err)
-	}
-	if resType2 != "gateway" {
-		t.Errorf("expected 'gateway', got %q", resType2)
-	}
-}
-
 func TestLoadServiceConfig_GatewayConnector(t *testing.T) {
 	yaml := `name: web
 cluster: prod
@@ -359,4 +331,41 @@ gatewayConnector:
 	if cfg.GatewayConnector.HealthCheck == nil || cfg.GatewayConnector.HealthCheck.Path != "/healthz" {
 		t.Errorf("unexpected health check config: %+v", cfg.GatewayConnector.HealthCheck)
 	}
+}
+
+func TestDetectResourceType(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{"cluster", "name: my-cluster\nregion: us-east-1\n", "cluster"},
+		{"service", "name: my-service\ncluster: my-cluster\n", "service"},
+		{"express-service", "serviceName: my-express\ninfrastructureRoleArn: arn:aws:iam::123:role/role\n", "express-service"},
+		{"gateway-deletionProtection", "name: my-gw\ndeletionProtection: true\n", "gateway"},
+		{"gateway-clusters", "name: my-gw\nclusters:\n  - c1\n", "gateway"},
+		{"gateway-kind", "name: my-gw\nkind: gateway\n", "gateway"},
+		{"gateway-configuration", "name: my-gw\nconfiguration:\n  hostSharedAlb:\n    scheme: internal\n", "gateway"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeTemp(t, tt.content)
+			res, err := DetectResourceType(path)
+			if err != nil {
+				t.Fatalf("unexpected error detecting resource type: %v", err)
+			}
+			if res != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, res)
+			}
+		})
+	}
+
+	t.Run("unrecognized resource returns error", func(t *testing.T) {
+		path := writeTemp(t, "foo: bar\nbaz: qux\n")
+		_, err := DetectResourceType(path)
+		if err == nil {
+			t.Fatal("expected error detecting unrecognized resource, got nil")
+		}
+	})
 }

@@ -141,3 +141,22 @@ ecsctl gateway delete my-gateway
 
 See [Amazon ECS Gateway Guide](gateway.md) for full configuration details.
 
+---
+
+## 🔍 Verbose Debug Logging (`--debug`)
+
+To diagnose AWS SDK errors, permission denials, signing issues, or HTTP timeouts, pass `--debug` to any `ecsctl` command or set `ECSCTL_DEBUG=true`:
+
+```bash
+# Print full HTTP request & response wire logging (headers, body, retries)
+ecsctl describe service my-service --cluster my-cluster --debug
+
+# Declarative apply with debug logging
+ecsctl apply -f service.yaml --debug
+```
+
+This streams the raw AWS wire traffic and request IDs to `stderr`, making it easy to isolate API issues and file AWS support requests.
+
+> [!WARNING]
+> Debug logging dumps raw HTTP wire traffic including request and response bodies. While AWS authentication headers are redacted automatically by the AWS SDK, bodies for commands such as `ecsctl apply` may contain sensitive environment variables or secret ARNs. Always review and scrub logs before sharing them in public bug reports or chats.
+
