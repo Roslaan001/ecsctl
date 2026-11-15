@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.6.0](https://github.com/Roslaan001/ecsctl/compare/v0.5.1...v0.6.0) (2026-11-15)
+
+
+### Features
+
+* add port-forward command for container port tunneling ([#58](https://github.com/Roslaan001/ecsctl/issues/58)) ([389bbe5](https://github.com/Roslaan001/ecsctl/commit/389bbe541ce6c766c6cfd13dd54bc4bf62d3479e))
+* **cli:** add global --debug flag for verbose AWS SDK wire logging ([#52](https://github.com/Roslaan001/ecsctl/issues/52)) ([81f0304](https://github.com/Roslaan001/ecsctl/commit/81f03040a20066cdfc672bd4d5884f2f6026e30e))
+* **gateway:** add Amazon ECS Gateway support ([#51](https://github.com/Roslaan001/ecsctl/issues/51)) ([0c313c9](https://github.com/Roslaan001/ecsctl/commit/0c313c98759d044d09df0e05f2d1dac659e8e7f7))
+
+
+### Bug Fixes
+
+* **ci:** exempt Dependabot and Release Please in PR validation ([#53](https://github.com/Roslaan001/ecsctl/issues/53)) ([25d85e7](https://github.com/Roslaan001/ecsctl/commit/25d85e7879279ef7a73a2eeb9a0f494bf82ec855))
+* **security:** harden input validation, installers, and response limits ([#55](https://github.com/Roslaan001/ecsctl/issues/55)) ([5be607c](https://github.com/Roslaan001/ecsctl/commit/5be607c835e36feeadbaab081cb20afba6736bfd))
+
+
+### Documentation
+
+* add issue templates and prerequisites section in readme ([#56](https://github.com/Roslaan001/ecsctl/issues/56)) ([9e1f684](https://github.com/Roslaan001/ecsctl/commit/9e1f684ac296a9181b71d0a7e1a2e13bdfd05b16))
+
+
+### Maintenance
+
+* **deps:** bump actions/setup-python from 7.0.0 to 7.1.0 ([#49](https://github.com/Roslaan001/ecsctl/issues/49)) ([8bcfbed](https://github.com/Roslaan001/ecsctl/commit/8bcfbed9a5aa3c6471fdf129f4d28a9bbeab7739))
+* **deps:** bump the go-dependencies group with 12 updates ([#50](https://github.com/Roslaan001/ecsctl/issues/50)) ([68b8eb9](https://github.com/Roslaan001/ecsctl/commit/68b8eb90d7f082149cf4f4ed4bc5e8324d8626d5))
+* **deps:** bump the go-dependencies group with 12 updates ([#59](https://github.com/Roslaan001/ecsctl/issues/59)) ([30ef1bc](https://github.com/Roslaan001/ecsctl/commit/30ef1bc28bd32eba0f5cd09c0bd7c9a926e78818))
+* **deps:** bump the go-dependencies group with 4 updates ([#47](https://github.com/Roslaan001/ecsctl/issues/47)) ([6ed9d03](https://github.com/Roslaan001/ecsctl/commit/6ed9d03d0da55138b00dbe13e76578b7ef0399c4))
+
 ## [0.5.1](https://github.com/Roslaan001/ecsctl/compare/v0.5.0...v0.5.1) (2026-10-16)
 
 
