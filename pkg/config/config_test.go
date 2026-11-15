@@ -269,4 +269,12 @@ func TestDetectResourceType(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("unrecognized resource returns error", func(t *testing.T) {
+		path := writeTemp(t, "foo: bar\nbaz: qux\n")
+		_, err := DetectResourceType(path)
+		if err == nil {
+			t.Fatal("expected error detecting unrecognized resource, got nil")
+		}
+	})
 }

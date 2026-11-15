@@ -217,8 +217,8 @@ func (cfg ServiceConfig) MarshalYAML() (any, error) {
 	return fields, nil
 }
 
-// DetectResourceType reads a YAML file and returns "cluster" or "service"
-// based on which required fields are present.
+// DetectResourceType reads a YAML file and returns "cluster", "service",
+// "express-service", or "gateway" based on which fields are present.
 func DetectResourceType(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -230,7 +230,6 @@ func DetectResourceType(path string) (string, error) {
 		return "", fmt.Errorf("parsing file %q: %w", path, err)
 	}
 
-	// A service config always has a "cluster" field; a cluster config does not.
 	if _, ok := raw["serviceName"]; ok {
 		return "express-service", nil
 	}
@@ -255,7 +254,7 @@ func DetectResourceType(path string) (string, error) {
 	if _, ok := raw["name"]; ok {
 		return "cluster", nil
 	}
-	return "", fmt.Errorf("cannot detect resource type in %q — file must have 'name' (cluster) or 'cluster' (service) field", path)
+	return "", fmt.Errorf("cannot detect resource type in %q — file must identify a cluster, service, express-service, or gateway", path)
 }
 
 // LoadClusterConfig reads and parses a cluster YAML config file.
