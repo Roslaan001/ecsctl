@@ -57,6 +57,36 @@ type mockECS struct {
 	describeExpressErr  error
 	deleteExpressInput  *ecs.DeleteExpressGatewayServiceInput
 	deleteExpressErr    error
+
+	createGatewayIn            *ecs.CreateGatewayInput
+	createGatewayOut           *ecs.CreateGatewayOutput
+	createGatewayErr           error
+	describeGatewayIn          *ecs.DescribeGatewayInput
+	describeGatewayOut         *ecs.DescribeGatewayOutput
+	describeGatewayErr         error
+	deleteGatewayIn            *ecs.DeleteGatewayInput
+	deleteGatewayErr           error
+	listGatewaysIn             *ecs.ListGatewaysInput
+	listGatewaysOut            *ecs.ListGatewaysOutput
+	listGatewaysErr            error
+	associateGatewayIn         *ecs.AssociateGatewayWithClusterInput
+	associateGatewayOut        *ecs.AssociateGatewayWithClusterOutput
+	associateGatewayErr        error
+	disassociateGatewayIn      *ecs.DisassociateGatewayFromClusterInput
+	disassociateGatewayOut     *ecs.DisassociateGatewayFromClusterOutput
+	disassociateGatewayErr     error
+	listGatewayClusterAssocIn  *ecs.ListGatewayClusterAssociationsInput
+	listGatewayClusterAssocOut *ecs.ListGatewayClusterAssociationsOutput
+	listGatewayClusterAssocErr error
+	describeGatewayResIn       *ecs.DescribeGatewayResourcesInput
+	describeGatewayResOut      *ecs.DescribeGatewayResourcesOutput
+	describeGatewayResErr      error
+	listGatewayRoutesIn        *ecs.ListGatewayRoutesInput
+	listGatewayRoutesOut       *ecs.ListGatewayRoutesOutput
+	listGatewayRoutesErr       error
+	describeGatewayRouteIn     *ecs.DescribeGatewayRouteInput
+	describeGatewayRouteOut    *ecs.DescribeGatewayRouteOutput
+	describeGatewayRouteErr    error
 }
 
 func (m *mockECS) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
@@ -171,6 +201,83 @@ func (m *mockECS) TagResource(_ context.Context, _ *ecs.TagResourceInput, _ ...f
 }
 func (m *mockECS) UntagResource(_ context.Context, _ *ecs.UntagResourceInput, _ ...func(*ecs.Options)) (*ecs.UntagResourceOutput, error) {
 	panic("unexpected: UntagResource")
+}
+
+func (m *mockECS) CreateGateway(_ context.Context, input *ecs.CreateGatewayInput, _ ...func(*ecs.Options)) (*ecs.CreateGatewayOutput, error) {
+	m.createGatewayIn = input
+	if m.createGatewayOut == nil {
+		m.createGatewayOut = &ecs.CreateGatewayOutput{}
+	}
+	return m.createGatewayOut, m.createGatewayErr
+}
+
+func (m *mockECS) DescribeGateway(_ context.Context, input *ecs.DescribeGatewayInput, _ ...func(*ecs.Options)) (*ecs.DescribeGatewayOutput, error) {
+	m.describeGatewayIn = input
+	if m.describeGatewayOut == nil {
+		m.describeGatewayOut = &ecs.DescribeGatewayOutput{}
+	}
+	return m.describeGatewayOut, m.describeGatewayErr
+}
+
+func (m *mockECS) DeleteGateway(_ context.Context, input *ecs.DeleteGatewayInput, _ ...func(*ecs.Options)) (*ecs.DeleteGatewayOutput, error) {
+	m.deleteGatewayIn = input
+	return &ecs.DeleteGatewayOutput{}, m.deleteGatewayErr
+}
+
+func (m *mockECS) ListGateways(_ context.Context, input *ecs.ListGatewaysInput, _ ...func(*ecs.Options)) (*ecs.ListGatewaysOutput, error) {
+	m.listGatewaysIn = input
+	if m.listGatewaysOut == nil {
+		m.listGatewaysOut = &ecs.ListGatewaysOutput{}
+	}
+	return m.listGatewaysOut, m.listGatewaysErr
+}
+
+func (m *mockECS) AssociateGatewayWithCluster(_ context.Context, input *ecs.AssociateGatewayWithClusterInput, _ ...func(*ecs.Options)) (*ecs.AssociateGatewayWithClusterOutput, error) {
+	m.associateGatewayIn = input
+	if m.associateGatewayOut == nil {
+		m.associateGatewayOut = &ecs.AssociateGatewayWithClusterOutput{}
+	}
+	return m.associateGatewayOut, m.associateGatewayErr
+}
+
+func (m *mockECS) DisassociateGatewayFromCluster(_ context.Context, input *ecs.DisassociateGatewayFromClusterInput, _ ...func(*ecs.Options)) (*ecs.DisassociateGatewayFromClusterOutput, error) {
+	m.disassociateGatewayIn = input
+	if m.disassociateGatewayOut == nil {
+		m.disassociateGatewayOut = &ecs.DisassociateGatewayFromClusterOutput{}
+	}
+	return m.disassociateGatewayOut, m.disassociateGatewayErr
+}
+
+func (m *mockECS) ListGatewayClusterAssociations(_ context.Context, input *ecs.ListGatewayClusterAssociationsInput, _ ...func(*ecs.Options)) (*ecs.ListGatewayClusterAssociationsOutput, error) {
+	m.listGatewayClusterAssocIn = input
+	if m.listGatewayClusterAssocOut == nil {
+		m.listGatewayClusterAssocOut = &ecs.ListGatewayClusterAssociationsOutput{}
+	}
+	return m.listGatewayClusterAssocOut, m.listGatewayClusterAssocErr
+}
+
+func (m *mockECS) DescribeGatewayResources(_ context.Context, input *ecs.DescribeGatewayResourcesInput, _ ...func(*ecs.Options)) (*ecs.DescribeGatewayResourcesOutput, error) {
+	m.describeGatewayResIn = input
+	if m.describeGatewayResOut == nil {
+		m.describeGatewayResOut = &ecs.DescribeGatewayResourcesOutput{}
+	}
+	return m.describeGatewayResOut, m.describeGatewayResErr
+}
+
+func (m *mockECS) ListGatewayRoutes(_ context.Context, input *ecs.ListGatewayRoutesInput, _ ...func(*ecs.Options)) (*ecs.ListGatewayRoutesOutput, error) {
+	m.listGatewayRoutesIn = input
+	if m.listGatewayRoutesOut == nil {
+		m.listGatewayRoutesOut = &ecs.ListGatewayRoutesOutput{}
+	}
+	return m.listGatewayRoutesOut, m.listGatewayRoutesErr
+}
+
+func (m *mockECS) DescribeGatewayRoute(_ context.Context, input *ecs.DescribeGatewayRouteInput, _ ...func(*ecs.Options)) (*ecs.DescribeGatewayRouteOutput, error) {
+	m.describeGatewayRouteIn = input
+	if m.describeGatewayRouteOut == nil {
+		m.describeGatewayRouteOut = &ecs.DescribeGatewayRouteOutput{}
+	}
+	return m.describeGatewayRouteOut, m.describeGatewayRouteErr
 }
 
 func testClient(mock *mockECS) *Client {

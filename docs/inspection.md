@@ -64,6 +64,14 @@ List task definition families and revisions. The default status is `ACTIVE`:
 ecsctl list task-definitions [--status ACTIVE|INACTIVE|DELETE_IN_PROGRESS] [--family PREFIX] [--wide]
 ```
 
+### 5. List Gateways
+
+List all Amazon ECS Gateways in the region:
+
+```bash
+ecsctl list gateways [--output table|json] [--wide] [--state]
+```
+
 ---
 
 ## 📄 Describing Resources (`describe`)
@@ -100,4 +108,16 @@ Inspect a task's status, stop reason, container exit codes and reasons, timestam
 
 ```bash
 ecsctl describe task <task-id-or-arn> --cluster <cluster-name>
+```
+
+### 4. Describe Gateway
+
+Show details, status, failure reasons, associated clusters, and auto-provisioned ALBs/routes for an Amazon ECS Gateway:
+
+```bash
+# Gateway overview
+ecsctl describe gateway <gateway-name-or-arn>
+
+# Include managed Application Load Balancers and active service routes
+ecsctl describe gateway <gateway-name-or-arn> --resources
 ```

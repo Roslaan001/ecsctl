@@ -1,0 +1,41 @@
+# ecsctl Sample Express Mode Service Configuration
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Roslaan001/ecsctl/main/schemas/express-service.json
+# Usage:
+#   ecsctl apply -f express-service.yaml --wait
+
+serviceName: my-express-service
+cluster: my-cluster
+infrastructureRoleArn: arn:aws:iam::123456789012:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS
+executionRoleArn: arn:aws:iam::123456789012:role/ecsTaskExecutionRole
+taskRoleArn: arn:aws:iam::123456789012:role/ecsTaskRole
+
+# Container workload
+image: public.ecr.aws/docker/library/httpd:latest
+containerPort: 80
+cpu: 0.25 vCPU
+memory: 0.5 GB
+cpuArchitecture: X86_64
+healthCheckPath: /healthz
+
+# Networking
+subnets:
+  - subnet-0bb123456789abcde
+  - subnet-0cc123456789abcde
+securityGroups:
+  - sg-0aa123456789abcde
+
+# Autoscaling
+minTaskCount: 1
+maxTaskCount: 10
+scalingMetric: REQUEST_COUNT_PER_TARGET
+scalingTargetValue: 1000
+
+# Logging
+awsLogsConfiguration:
+  logGroup: /ecs/my-express-service
+  logStreamPrefix: express
+
+# Resource tags applied to the Express service
+tags:
+  env: production
+  team: platform

@@ -115,6 +115,34 @@ ecsctl exec my-service --cluster my-cluster --container web-app --command "pytho
 
 ---
 
+## 🌐 Amazon ECS Gateways (`gateway`)
+
+Manage account-level Amazon ECS Gateways, link clusters, and inspect managed ingress routes:
+
+```bash
+# Create a gateway
+ecsctl gateway create -f gateway.yaml
+
+# Link gateway to an ECS cluster
+ecsctl gateway associate --gateway my-gateway --cluster prod-cluster
+
+# Unlink gateway from an ECS cluster
+ecsctl gateway disassociate --gateway my-gateway --cluster prod-cluster
+
+# List gateways
+ecsctl gateway list
+
+# Inspect gateway and auto-provisioned ALBs/routes
+ecsctl gateway describe my-gateway --resources
+
+# Delete a gateway
+ecsctl gateway delete my-gateway
+```
+
+See [Amazon ECS Gateway Guide](gateway.md) for full configuration details.
+
+---
+
 ## 🔍 Verbose Debug Logging (`--debug`)
 
 To diagnose AWS SDK errors, permission denials, signing issues, or HTTP timeouts, pass `--debug` to any `ecsctl` command or set `ECSCTL_DEBUG=true`:

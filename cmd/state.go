@@ -227,7 +227,8 @@ var stateImportCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Example: `  ecsctl state import cluster my-cluster --region eu-west-2
   ecsctl state import service my-service --cluster my-cluster --region eu-west-2
-  ecsctl state import express my-api --cluster my-cluster --region eu-west-2`,
+  ecsctl state import express my-api --cluster my-cluster --region eu-west-2
+  ecsctl state import gateway my-gateway --region eu-west-2`,
 	RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 		resourceType := args[0]
 		resourceName := args[1]
@@ -299,8 +300,15 @@ var stateImportCmd = &cobra.Command{
 			}
 			res = *r
 
+		case "gateway":
+			r, err := ecsClient.DescribeGatewayResource(ctx, resourceName)
+			if err != nil {
+				return err
+			}
+			res = *r
+
 		default:
-			return fmt.Errorf("unknown resource type %q — supported: cluster, service, express", resourceType)
+			return fmt.Errorf("unknown resource type %q — supported: cluster, service, express, gateway", resourceType)
 		}
 		res.Region = resolvedRegion
 
@@ -488,6 +496,13 @@ var stateDriftCmd = &cobra.Command{
 					failed++
 					continue
 				}
+			case state.ResourceTypeGateway:
+				var gwCfg config.GatewayConfig
+				if err := yaml.Unmarshal([]byte(resource.Configuration), &gwCfg); err != nil {
+					fmt.Printf("[error] gateway %q: decoding saved configuration: %v\n", resource.Name, err)
+					failed++
+					continue
+				}
 			default:
 				fmt.Printf("[skipped] %s %q: unsupported tracked resource type\n", resource.Type, resource.Name)
 				skipped++
@@ -518,6 +533,10 @@ var stateDriftCmd = &cobra.Command{
 				changed, err = client.ReconcileService(ctx, serviceCfg, true)
 			case state.ResourceTypeExpressService:
 				changed, err = client.ReconcileExpressService(ctx, resource.ARN, &expressCfg, true)
+			case state.ResourceTypeGateway:
+				var gwCfg config.GatewayConfig
+				_ = yaml.Unmarshal([]byte(resource.Configuration), &gwCfg)
+				changed, err = client.ReconcileGateway(ctx, &gwCfg, true)
 			}
 			if err != nil {
 				fmt.Printf("[error] %s %q: %v\n", resource.Type, resource.Name, err)
