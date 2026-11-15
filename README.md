@@ -53,6 +53,8 @@ This will automatically create a local Python virtual environment, install the `
 
 ---
 
+## Prerequisites
+
 - Go 1.26+
 - AWS credentials configured (`~/.aws/credentials`, environment variables, or IAM role)
 - [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) (required for `ecsctl exec`)
