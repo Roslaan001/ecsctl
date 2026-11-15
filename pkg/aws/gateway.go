@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	ecscfg "github.com/roslaan001/ecsctl/pkg/config"
+	"github.com/roslaan001/ecsctl/pkg/state"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -417,4 +419,114 @@ func (c *Client) PrintGatewayDetail(ctx context.Context, nameOrArn string, showR
 	}
 
 	return nil
+}
+
+// DescribeGatewayResource fetches an ECS Gateway from AWS and returns it as a state.Resource.
+func (c *Client) DescribeGatewayResource(ctx context.Context, nameOrArn string) (*state.Resource, error) {
+	gw, err := c.DescribeGateway(ctx, nameOrArn)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &ecscfg.GatewayConfig{
+		Name:                  aws.ToString(gw.Name),
+		InfrastructureRoleARN: aws.ToString(gw.InfrastructureRoleArn),
+		DeletionProtection:    gw.DeletionProtection,
+	}
+
+	if len(gw.Tags) > 0 {
+		cfg.Tags = make(map[string]string, len(gw.Tags))
+		for _, t := range gw.Tags {
+			cfg.Tags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+		}
+	}
+
+	if albMember, ok := gw.Configuration.(*types.DescribeGatewayConfigurationMemberHostSharedAlb); ok {
+		alb := albMember.Value
+		cfg.Configuration = &ecscfg.GatewayConfigurationConfig{
+			HostSharedAlb: &ecscfg.HostSharedAlbConfig{
+				Scheme:    string(alb.Scheme),
+				WebACLArn: aws.ToString(alb.WebACLArn),
+			},
+		}
+		if alb.MaxAlbCount != nil {
+			cfg.Configuration.HostSharedAlb.MaxAlbCount = *alb.MaxAlbCount
+		}
+		if alb.NetworkConfiguration != nil {
+			cfg.Configuration.HostSharedAlb.Network = &ecscfg.GatewayNetworkConfig{
+				Subnets:              alb.NetworkConfiguration.Subnets,
+				InboundSecurityGroup: aws.ToString(alb.NetworkConfiguration.InboundSecurityGroup),
+				IPAddressType:        string(alb.NetworkConfiguration.IpAddressType),
+			}
+		}
+	}
+
+	clusters, err := c.ListGatewayClusters(ctx, nameOrArn)
+	if err == nil && len(clusters) > 0 {
+		cfg.Clusters = clusters
+	}
+
+	cfgYAML, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("serializing imported gateway configuration: %w", err)
+	}
+
+	return &state.Resource{
+		Type:          state.ResourceTypeGateway,
+		Name:          aws.ToString(gw.Name),
+		ARN:           aws.ToString(gw.GatewayArn),
+		Region:        c.Region(),
+		CreatedBy:     "imported",
+		Configuration: string(cfgYAML),
+	}, nil
+}
+
+// ReconcileGateway compares a desired gateway configuration with AWS and reports drift.
+func (c *Client) ReconcileGateway(ctx context.Context, desired *ecscfg.GatewayConfig, dryRun bool) (bool, error) {
+	gw, err := c.DescribeGateway(ctx, desired.Name)
+	if err != nil {
+		return false, err
+	}
+
+	var hasDrift bool
+
+	if desired.DeletionProtection != nil && gw.DeletionProtection != nil && *desired.DeletionProtection != *gw.DeletionProtection {
+		if dryRun {
+			fmt.Printf("~ Gateway %q deletionProtection differs (AWS: %v, Config: %v)\n", desired.Name, *gw.DeletionProtection, *desired.DeletionProtection)
+		}
+		hasDrift = true
+	}
+
+	clusters, err := c.ListGatewayClusters(ctx, desired.Name)
+	if err == nil {
+		clusterSet := make(map[string]bool, len(clusters))
+		for _, cl := range clusters {
+			clusterSet[cl] = true
+		}
+		for _, cl := range desired.Clusters {
+			if !clusterSet[cl] {
+				if dryRun {
+					fmt.Printf("~ Gateway %q missing cluster association: %s\n", desired.Name, cl)
+				}
+				hasDrift = true
+			}
+		}
+	}
+
+	if desired.Tags != nil {
+		liveTags := make(map[string]string, len(gw.Tags))
+		for _, t := range gw.Tags {
+			liveTags[aws.ToString(t.Key)] = aws.ToString(t.Value)
+		}
+		for k, v := range desired.Tags {
+			if liveTags[k] != v {
+				if dryRun {
+					fmt.Printf("~ Gateway %q tag %q differs (AWS: %q, Config: %q)\n", desired.Name, k, liveTags[k], v)
+				}
+				hasDrift = true
+			}
+		}
+	}
+
+	return hasDrift, nil
 }
